@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from ficha import (
@@ -9,6 +11,16 @@ from ficha import (
     render,
     temas_from_test_id,
 )
+
+
+@pytest.fixture(autouse=True)
+def madrid_time(monkeypatch):
+    """Fichas use local time; pin the zone so results do not depend on the machine."""
+    monkeypatch.setenv("TZ", "Europe/Madrid")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
 
 
 def item(n, key, ans, *, doubt=False, stuck=False, secs=30, at=None, cause=None):
@@ -162,3 +174,10 @@ def test_merge_prepared_refuses_key_mismatch():
     stale = PREPARED.replace("clave:         CADBA", "clave:         CADBB")
     with pytest.raises(FichaError, match="key in prepared ficha differs"):
         merge_prepared(stale, build_fields(make_attempt(), {}))
+
+
+def test_utc_timestamps_from_the_app_become_local_date_and_times():
+    attempt = make_attempt(started="2026-10-13T22:30:00Z", finished="2026-10-13T22:47:12Z")
+    fields = build_fields(attempt, {})
+    assert fields["fecha"] == "2026-10-14"
+    assert fields["observaciones"].endswith("Inicio 00:30, fin 00:47. Hecho en la app.")

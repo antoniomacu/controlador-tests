@@ -14,12 +14,14 @@ import {
   toResultsFile,
   toggleDoubt,
   toggleStuck,
+  toLocalIso,
   type NewAttempt,
 } from '../../src/domain/attempts';
 import type { Attempt, Question } from '../../src/domain/types';
 
 const T0 = Date.UTC(2026, 9, 14, 18, 30, 0);
 const s = (n: number) => T0 + n * 1000;
+const LOCAL_ISO = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$/;
 
 function q(n: number, answer: 'a' | 'b' | 'c' | 'd'): Question {
   return {
@@ -57,7 +59,8 @@ describe('attempts', () => {
     expect(a.items.every((i) => i.ans === null && i.secs === 0)).toBe(true);
     expect(a.questions[0].stem).toBe('Q1');
     expect(a.status).toBe('in_progress');
-    expect(a.started).toBe('2026-10-14T18:30:00.000Z');
+    expect(a.started).toMatch(LOCAL_ISO);
+    expect(Date.parse(a.started)).toBe(T0);
     expect(a.timer.limitSecs).toBe(180);
   });
 
@@ -101,7 +104,8 @@ describe('attempts', () => {
     expect(a.status).toBe('finished');
     expect(a.total_secs).toBe(70);
     expect(a.items[1].secs).toBe(40);
-    expect(a.finished).toBe('2026-10-14T18:31:10.000Z');
+    expect(a.finished).toMatch(LOCAL_ISO);
+    expect(Date.parse(a.finished as string)).toBe(s(70));
   });
 
   it('auto-finishes an expired exam at exactly the limit', () => {
@@ -110,6 +114,7 @@ describe('attempts', () => {
     const done = autoFinishIfExpired(a, s(5000));
     expect(done.status).toBe('finished');
     expect(done.total_secs).toBe(180);
+    expect(Date.parse(done.finished as string)).toBe(s(180));
   });
 
   it('never auto-finishes practice mode', () => {
@@ -171,5 +176,19 @@ describe('attempts', () => {
     const exported: Attempt[] = markExported([done]);
     expect(pendingExportCount(exported)).toBe(0);
     expect(needsExportReminder(exported, s(30) + 8 * day)).toBe(false);
+  });
+});
+
+describe('toLocalIso', () => {
+  it('writes local wall-clock time with its UTC offset', () => {
+    const ms = Date.UTC(2026, 9, 13, 22, 30, 5);
+    const iso = toLocalIso(ms);
+    expect(iso).toMatch(LOCAL_ISO);
+    expect(Date.parse(iso)).toBe(ms);
+    const local = new Date(ms);
+    expect(iso.slice(0, 10)).toBe(
+      `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}`,
+    );
+    expect(Number(iso.slice(11, 13))).toBe(local.getHours());
   });
 });

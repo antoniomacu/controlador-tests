@@ -28,6 +28,23 @@ export interface NewAttempt {
 
 const REMINDER_MS = 7 * 24 * 3600 * 1000;
 
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * ISO 8601 in local wall-clock time with its UTC offset (`2026-10-14T20:30:00+02:00`).
+ * The Mac reads the date and the start/end times straight from these strings, so they must
+ * be the user's local time, not UTC.
+ */
+export function toLocalIso(ms: number): string {
+  const d = new Date(ms);
+  const offset = -d.getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  const abs = Math.abs(offset);
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${date}T${time}${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}
+
 export function createAttempt(i: NewAttempt): Attempt {
   return {
     uuid: i.uuid,
@@ -35,7 +52,7 @@ export function createAttempt(i: NewAttempt): Attempt {
     kind: i.kind,
     mode: i.mode,
     attempt: i.attemptNumber,
-    started: new Date(i.nowMs).toISOString(),
+    started: toLocalIso(i.nowMs),
     finished: null,
     limit_min: i.limitMin,
     total_secs: 0,
@@ -109,10 +126,13 @@ export function resumeAttempt(a: Attempt, nowMs: number): Attempt {
 export function finishAttempt(a: Attempt, nowMs: number): Attempt {
   const elapsed = elapsedSecs(a.timer, nowMs);
   const charged = charge(a, elapsed);
+  // An exam that ran out (possibly while the app was closed) ended at the limit, not now.
+  const t = a.timer;
+  const endMs = isExpired(t, nowMs) ? t.startedAtMs + t.pausedTotalMs + t.limitSecs * 1000 : nowMs;
   return {
     ...charged,
     status: 'finished',
-    finished: new Date(nowMs).toISOString(),
+    finished: toLocalIso(endMs),
     total_secs: elapsed,
   };
 }

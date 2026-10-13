@@ -1,4 +1,4 @@
-import { toResultsFile } from '../domain/attempts';
+import { toLocalIso, toResultsFile } from '../domain/attempts';
 import type { Attempt } from '../domain/types';
 
 export interface ShareNav {
@@ -9,7 +9,7 @@ export interface ShareNav {
 const pad = (n: number) => String(n).padStart(2, '0');
 
 export function buildResultsFile(attempts: readonly Attempt[], now: Date): File | null {
-  const results = toResultsFile(attempts, now.toISOString());
+  const results = toResultsFile(attempts, toLocalIso(now.getTime()));
   if (results.attempts.length === 0) return null;
   const day = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
   const stamp = `${day}-${pad(now.getHours())}${pad(now.getMinutes())}`;

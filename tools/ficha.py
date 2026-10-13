@@ -8,6 +8,7 @@ written, because that script rejects any other field. Exam versus Practice mode 
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 
 from bank_parser import parse_front_matter, parse_key_file
@@ -27,6 +28,11 @@ TEMAS_IN_ID = re.compile(r"-T(\d+)-")
 
 class FichaError(ValueError):
     """Raised when an attempt cannot be turned into a valid ficha."""
+
+
+def _local(iso: str | None) -> dt.datetime | None:
+    """Parse an ISO timestamp (``Z`` or any offset) and convert it to the Mac's local time."""
+    return dt.datetime.fromisoformat(iso).astimezone() if iso else None
 
 
 def mmss(secs: int) -> str:
@@ -81,14 +87,16 @@ def build_fields(attempt: dict, subtipos_by_q: dict[str, str]) -> dict[str, str]
     mode = (
         "Modo examen (corte duro)" if attempt["mode"] == "exam" else "Modo práctica (límite blando)"
     )
-    start, end = attempt["started"][11:16], (attempt["finished"] or "")[11:16]
+    started, finished = _local(attempt["started"]), _local(attempt["finished"])
+    start = started.strftime("%H:%M") if started else ""
+    end = finished.strftime("%H:%M") if finished else ""
     return {
         "id": ficha_id(attempt),
         "categoria": "SYN",
         "dificultad": "SINTETICO",
         "modo": "Mixto" if len(temas_from_test_id(attempt["test_id"])) > 1 else "Bloque",
         "intento": str(attempt["attempt"]),
-        "fecha": attempt["started"][:10],
+        "fecha": started.date().isoformat() if started else "",
         "preguntas": str(len(items)),
         "limite": f"{attempt['limit_min']:g}",
         "tiempo": mmss(attempt["total_secs"]),
