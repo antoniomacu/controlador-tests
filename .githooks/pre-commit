@@ -1,0 +1,4 @@
+#!/bin/sh
+# Refuse any commit that would put personal data or question content in this public repo.
+# Enabled once per clone with: git config core.hooksPath .githooks
+exec uv --directory tools run --quiet python check_repo_safety.py

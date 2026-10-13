@@ -1,0 +1,20 @@
+[project]
+name = "controlador-tools"
+version = "0.1.0"
+description = "Mac-side tools for controlador-tests: build bank.json and import results.json"
+requires-python = ">=3.12"
+dependencies = ["openpyxl>=3.1"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
