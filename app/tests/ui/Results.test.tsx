@@ -20,7 +20,7 @@ const q = (n: number, answer: 'a' | 'b'): Question => ({
   options: { a: `A${n}`, b: `B${n}`, c: `C${n}`, d: `D${n}` },
   cite: `T1, pág. ${n}`,
   explanation: `**Explicación** ${n}`,
-  hook: `Gancho ${n}`,
+  hook: `Gancho **clave ${n}**`,
 });
 
 function finished(): Attempt {
@@ -68,7 +68,8 @@ describe('Results', () => {
     render(<Results attempt={finished()} onChange={vi.fn()} onHome={vi.fn()} />);
     expect(screen.getAllByText('Explicación')[0].tagName).toBe('STRONG');
     expect(screen.getByText('[T1, pág. 2] · N2')).toBeTruthy();
-    expect(screen.getByText('Gancho 2')).toBeTruthy();
+    expect(screen.getByText('clave 2').tagName).toBe('STRONG');
+    expect(screen.queryByText(/\*\*/)).toBeNull();
   });
 
   it('marks the correct option and a wrong choice in text, not only colour', () => {

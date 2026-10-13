@@ -85,7 +85,11 @@ export function Results({ attempt: a, onChange, onHome }: ResultsProps) {
             </ol>
             {q.cite && <p class="cite">{`[${q.cite}] · ${q.level}`}</p>}
             {q.explanation && <Markdown text={q.explanation} />}
-            {q.hook && <p class="hook">{q.hook}</p>}
+            {q.hook && (
+              <div class="hook">
+                <Markdown text={q.hook} />
+              </div>
+            )}
             {(isWrong(item) || item.doubt) && (
               <label class="cause">
                 Causa
