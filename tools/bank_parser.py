@@ -166,3 +166,78 @@ def parse_groups(value: str) -> dict[int, str]:
             else:
                 mapping[int(chunk)] = label.strip()
     return mapping
+
+
+MODERN_ANSWER_RE = re.compile(
+    r"^\*\*Respuesta:\s*([a-d])\)\s*(.*?)\*\*\s*·\s*\[([^\]]+)\]\s*·\s*(N[123])"
+)
+LEGACY_ANSWER_RE = re.compile(
+    r"^\*\*(\d+)\.\s*([a-d])\)\s*(.*?)\*\*\s*·\s*\[([^\]]+)\]\s*·\s*(N[123])"
+)
+HOOK_RE = re.compile(r"^\*\*Gancho:\*\*\s*(.*)$", re.DOTALL)
+
+
+@dataclass
+class ParsedSolution:
+    number: int
+    answer: str
+    cite: str
+    level: str
+    explanation: str
+    hook: str | None
+
+
+def _split_body(lines: list[str]) -> tuple[str, str | None]:
+    paragraphs = [p.strip() for p in "\n".join(lines).split("\n\n") if p.strip()]
+    hook: str | None = None
+    explanation: list[str] = []
+    for paragraph in paragraphs:
+        match = HOOK_RE.match(paragraph)
+        if match:
+            hook = " ".join(match.group(1).split())
+        else:
+            explanation.append(paragraph)
+    return "\n\n".join(explanation), hook
+
+
+def parse_solutions(section: str) -> dict[int, ParsedSolution]:
+    """Parse ``## SOLUCIONES RAZONADAS`` blocks separated by ``---`` lines.
+
+    Modern layout: ``**N.** *stem*`` then ``**Respuesta: c) text** · [T4, pág. 6] · N1``.
+    Legacy layout (``SYN-T1-001``): ``**1. b) 1944** · [T1, pág. 5] · N1``.
+    The lines after the answer line form the explanation; a paragraph starting with
+    ``**Gancho:**`` becomes the hook. Blocks without an answer line are skipped.
+    """
+    solutions: dict[int, ParsedSolution] = {}
+    for block in re.split(r"^---\s*$", section, flags=re.MULTILINE):
+        lines = block.strip().splitlines()
+        number: int | None = None
+        found: tuple[str, str, str] | None = None
+        body_start = 0
+        for index, raw in enumerate(lines):
+            line = raw.strip()
+            legacy = LEGACY_ANSWER_RE.match(line)
+            if legacy:
+                number = int(legacy.group(1))
+                found = (legacy.group(2), legacy.group(4), legacy.group(5))
+                body_start = index + 1
+                break
+            modern = MODERN_ANSWER_RE.match(line)
+            if modern:
+                found = (modern.group(1), modern.group(3), modern.group(4))
+                body_start = index + 1
+                for previous in lines[:index]:
+                    head = QUESTION_RE.match(previous.strip())
+                    if head:
+                        number = int(head.group(1))
+                break
+        if found is None:
+            continue
+        if number is None:
+            raise ParseError(f"solution block has no question number: {lines[0]!r}")
+        if number in solutions:
+            raise ParseError(f"solution {number} appears twice")
+        explanation, hook = _split_body(lines[body_start:])
+        answer, cite, level = found
+        solutions[number] = ParsedSolution(number, answer, cite.strip(), level, explanation, hook)
+    return solutions
