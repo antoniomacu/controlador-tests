@@ -11,3 +11,12 @@ __pycache__/
 # Personal data: never commit the bank or results
 bank*.json
 results*.json
+*.xlsx
+*.xlsm
+*.xls
+claves/
+*.png
+*.jpg
+*.jpeg
+*.webp
+!app/public/*.png

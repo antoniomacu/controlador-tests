@@ -115,6 +115,14 @@ npm run build    # type-check and production build into app/dist
 
 ### The Mac tools
 
+After cloning, enable the repository's pre-commit hook once. It runs the safety check described
+in [What must never be committed](#what-must-never-be-committed) before every commit and refuses
+the commit if anything forbidden is staged:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 The tools live in `tools/` and use Python with **uv** for dependencies, **pytest** for tests and
 **Ruff** for linting and formatting.
 
@@ -131,8 +139,9 @@ of the Excel workbook; no test ever opens the real one.
 
 ### Continuous integration and deployment
 
-Every push to `main` runs the repository safety check, the Python tests and lint, the app tests and
-the production build in GitHub Actions, then publishes `app/dist` to GitHub Pages. The phone picks
+Every push to any branch runs the repository safety check, the Python tests and lint, the app tests
+and the production build in GitHub Actions. Only pushes to `main` then publish `app/dist` to GitHub
+Pages. The phone picks
 up the new version the next time the app opens with a connection, and offers to reload — never
 during a test.
 
@@ -140,9 +149,12 @@ during a test.
 
 This repository is public, because GitHub Pages on the free plan requires it. It must therefore
 contain application code only: no questions, no syllabus text, and no results. `bank*.json` and
-`results*.json` are ignored by git, and `tools/check_repo_safety.py` fails if any of them, or any
-Markdown file containing a synthetic test's `TEST` or `CLAVE` section, is tracked. The check runs
-in CI on every push. The only exceptions are the invented fixtures in `tools/tests/fixtures/` and the
+`results*.json` are ignored by git, as are Excel workbooks, archived answer keys (`claves/`) and
+images outside `app/public/`, since a screenshot can show question content.
+`tools/check_repo_safety.py` fails if any of them, or any Markdown file containing a synthetic
+test's `TEST` or `CLAVE` section, is tracked. It runs before every commit through the
+pre-commit hook in `.githooks/`, and in CI on every push to every branch, so a forbidden file is
+stopped before it can reach the public repository rather than detected after. The only exceptions are the invented fixtures in `tools/tests/fixtures/` and the
 design documents in `docs/superpowers/`.
 
 ## References

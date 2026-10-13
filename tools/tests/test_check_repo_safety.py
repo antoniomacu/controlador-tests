@@ -54,3 +54,22 @@ def test_heading_mentioned_inline_is_not_a_violation(tmp_path):
     repo = make_repo(tmp_path)
     track(repo, "README.md", "The `## TEST` section is parsed.\n")
     assert violations(repo) == []
+
+
+def test_workbooks_keys_and_screenshots_are_violations(tmp_path):
+    repo = make_repo(tmp_path)
+    track(repo, "Teoria_Maestro_v1.xlsx", "x")
+    track(repo, "vault/20-REGISTRO/claves/SYN-T4-001.txt", "CADBB")
+    track(repo, "shots/3-runner.png", "x")
+    found = violations(repo)
+    assert len(found) == 3
+
+
+def test_app_icons_are_allowed(tmp_path):
+    repo = make_repo(tmp_path)
+    track(repo, "app/public/icon-192.png", "x")
+    assert violations(repo) == []
+
+
+def test_this_repository_is_clean():
+    assert violations(Path(__file__).resolve().parents[2]) == []

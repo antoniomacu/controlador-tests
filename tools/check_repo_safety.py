@@ -3,7 +3,9 @@
 The repository is public (GitHub Pages on the free plan requires it), so it must only ever
 contain application code. This check is run locally and in CI. It flags:
 
-* any tracked ``bank*.json`` or ``results*.json`` file, and
+* any tracked ``bank*.json`` or ``results*.json`` file;
+* any Excel workbook, archived answer key (``claves/*.txt``) or image outside ``app/public/``
+  (screenshots can show question content); and
 * any tracked Markdown file with a line that is exactly ``## TEST`` or ``## CLAVE`` — the
   headings of a synthetic test — outside the allowed fixture and documentation folders.
 """
@@ -16,6 +18,12 @@ import sys
 from pathlib import Path
 
 FORBIDDEN_NAME = re.compile(r"(^|/)(bank|results)[^/]*\.json$")
+FORBIDDEN_OTHER = (
+    (re.compile(r"\.(xlsx|xlsm|xls)$"), "Excel workbook (study registry)"),
+    (re.compile(r"(^|/)claves/[^/]*\.txt$"), "archived answer key"),
+    (re.compile(r"\.(png|jpe?g|webp|gif)$"), "image outside app/public (may show questions)"),
+)
+IMAGE_PREFIX_ALLOWED = "app/public/"
 FORBIDDEN_HEADING = re.compile(r"^## (TEST|CLAVE)\s*$", re.MULTILINE)
 ALLOWED_PREFIXES = ("tools/tests/fixtures/", "docs/superpowers/")
 
@@ -36,6 +44,10 @@ def violations(repo: Path) -> list[str]:
             continue
         if FORBIDDEN_NAME.search(rel):
             found.append(f"{rel}: bank/results file must never be committed")
+            continue
+        other = next((label for rx, label in FORBIDDEN_OTHER if rx.search(rel)), None)
+        if other and not (other.startswith("image") and rel.startswith(IMAGE_PREFIX_ALLOWED)):
+            found.append(f"{rel}: {other} must never be committed")
             continue
         if rel.endswith(".md"):
             path = repo / rel
