@@ -9,6 +9,7 @@ import {
 import { summarizeBankChange } from './domain/bank';
 import type { Attempt, Bank, Subject } from './domain/types';
 import {
+  deleteAttempt,
   getBank,
   listAttempts,
   putAttempt,
@@ -105,6 +106,15 @@ export function App({
     [save],
   );
 
+  const onAbandon = useCallback(
+    (uuid: string) => {
+      setAttempts((prev) => prev.filter((a) => a.uuid !== uuid));
+      void deleteAttempt(db, uuid);
+      setScreen({ name: 'home' });
+    },
+    [db],
+  );
+
   function begin(input: BeginInput) {
     const attempt = createAttempt({
       ...input,
@@ -157,6 +167,7 @@ export function App({
         confirmFn={confirmFn}
         onChange={save}
         onFinished={onFinished}
+        onAbandon={onAbandon}
       />
     );
   } else if (screen.name === 'results' && current) {

@@ -35,6 +35,11 @@ export async function putAttempts(db: Db, attempts: readonly Attempt[]): Promise
   await Promise.all([...attempts.map((a) => tx.store.put(a)), tx.done]);
 }
 
+/** Removes an abandoned attempt; it is never exported or registered. */
+export async function deleteAttempt(db: Db, uuid: string): Promise<void> {
+  await db.delete('attempts', uuid);
+}
+
 export async function getMeta<T>(db: Db, key: string): Promise<T | null> {
   return ((await db.get('meta', key)) as T | undefined) ?? null;
 }

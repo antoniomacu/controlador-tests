@@ -1,4 +1,5 @@
 import {
+  deleteAttempt,
   getBank,
   getMeta,
   listAttempts,
@@ -32,6 +33,13 @@ describe('db', () => {
     const all = await listAttempts(db);
     expect(all.map((a) => a.uuid)).toEqual(['a', 'b']);
     expect(all[1].total_secs).toBe(5);
+  });
+
+  it('deletes an attempt', async () => {
+    const db = await fresh();
+    await putAttempts(db, [attempt('a', '1'), attempt('b', '2')]);
+    await deleteAttempt(db, 'a');
+    expect((await listAttempts(db)).map((x) => x.uuid)).toEqual(['b']);
   });
 
   it('stores meta values', async () => {

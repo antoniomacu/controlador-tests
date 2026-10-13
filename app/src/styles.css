@@ -276,3 +276,13 @@ input[type='number'] { width: 6em; margin-left: auto; font-variant-numeric: tabu
 .md th { background: var(--surface-raised); }
 .filters > button { flex: 1 1 40%; }
 .grid { padding: 4px; }
+
+/* Abandon: secondary, visually separated from the primary Terminar action. */
+.abandon {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-3);
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}

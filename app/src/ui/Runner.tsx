@@ -25,10 +25,18 @@ interface RunnerProps {
   confirmFn: (message: string) => boolean;
   onChange: (attempt: Attempt) => void;
   onFinished: (attempt: Attempt) => void;
+  onAbandon: (uuid: string) => void;
 }
 
 /** One question per screen, with the clock, flags, navigation and the question grid. */
-export function Runner({ attempt: a, now, confirmFn, onChange, onFinished }: RunnerProps) {
+export function Runner({
+  attempt: a,
+  now,
+  confirmFn,
+  onChange,
+  onFinished,
+  onAbandon,
+}: RunnerProps) {
   const nowMs = useNow(now);
   const [showGrid, setShowGrid] = useState(false);
   const item = a.items[a.current];
@@ -151,6 +159,17 @@ export function Runner({ attempt: a, now, confirmFn, onChange, onFinished }: Run
 
       <button type="button" class="finish" onClick={finish}>
         Terminar
+      </button>
+      <button
+        type="button"
+        class="abandon"
+        onClick={() => {
+          if (confirmFn('¿Abandonar este intento? Se borrará y no contará para nada.')) {
+            onAbandon(a.uuid);
+          }
+        }}
+      >
+        Abandonar
       </button>
     </main>
   );

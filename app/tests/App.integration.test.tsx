@@ -111,6 +111,15 @@ describe('App', () => {
     expect(saved.exported).toBe(true);
   });
 
+  it('abandoning deletes the attempt and returns home', async () => {
+    mount();
+    await startTest();
+    fireEvent.click(screen.getByRole('button', { name: 'Abandonar' }));
+    expect(await screen.findByRole('button', { name: /Tema 4/ })).toBeTruthy();
+    await waitFor(async () => expect(await listAttempts(db)).toHaveLength(0));
+    expect(screen.getByText('Sin hacer')).toBeTruthy();
+  });
+
   it('keeps the old bank when an invalid file is imported', async () => {
     const { container } = mount();
     await screen.findByRole('button', { name: /Tema 4/ });

@@ -30,6 +30,7 @@ function setup(mode: 'exam' | 'practice' = 'exam', nowMs = T0 + 5000) {
   });
   const onChange = vi.fn<(a: Attempt) => void>();
   const onFinished = vi.fn<(a: Attempt) => void>();
+  const onAbandon = vi.fn<(uuid: string) => void>();
   const confirmFn = vi.fn(() => true);
   const now = () => nowMs;
   render(
@@ -39,9 +40,10 @@ function setup(mode: 'exam' | 'practice' = 'exam', nowMs = T0 + 5000) {
       confirmFn={confirmFn}
       onChange={onChange}
       onFinished={onFinished}
+      onAbandon={onAbandon}
     />,
   );
-  return { attempt, onChange, onFinished, confirmFn };
+  return { attempt, onChange, onFinished, onAbandon, confirmFn };
 }
 
 describe('Runner', () => {
@@ -93,6 +95,16 @@ describe('Runner', () => {
     setup('practice', T0 + 130_000);
     expect(screen.getByText('+00:10')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Pausa' })).toBeTruthy();
+  });
+
+  it('abandons after confirmation without finishing', () => {
+    const { onAbandon, onFinished, confirmFn } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Abandonar' }));
+    expect(confirmFn).toHaveBeenCalledWith(
+      '¿Abandonar este intento? Se borrará y no contará para nada.',
+    );
+    expect(onAbandon).toHaveBeenCalledWith('u');
+    expect(onFinished).not.toHaveBeenCalled();
   });
 
   it('exam mode has no pause button', () => {
