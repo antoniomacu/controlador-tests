@@ -111,3 +111,58 @@ def parse_questions(section: str) -> list[ParsedQuestion]:
             found = "".join(sorted(question.options))
             raise ParseError(f"question {question.number} has options {found}, expected abcd")
     return questions
+
+
+KEY_RANGE_PREFIX = re.compile(r"^\s*\d+\s*-\s*\d+")
+KEY_LETTER = re.compile(r"[A-Da-d]")
+
+
+def _key_letters(lines: list[str]) -> list[str]:
+    letters: list[str] = []
+    for line in lines:
+        letters.extend(ch.lower() for ch in KEY_LETTER.findall(KEY_RANGE_PREFIX.sub("", line)))
+    return letters
+
+
+def parse_key(section: str) -> list[str]:
+    """Parse a ``## CLAVE`` section in either layout.
+
+    Layout 1 (``SYN-T1-001``): grouped uppercase letters, ``BCACB DDDCA``.
+    Layout 2 (later tests): numbered rows of lowercase letters, ``1-10   c a b d c   b c b d b``.
+    If the section has a code fence, only the lines inside it are read.
+    """
+    lines = section.splitlines()
+    fences = [i for i, line in enumerate(lines) if line.strip().startswith("```")]
+    if len(fences) >= 2:
+        lines = lines[fences[0] + 1 : fences[1]]
+    letters = _key_letters(lines)
+    if not letters:
+        raise ParseError("empty answer key")
+    return letters
+
+
+def parse_key_file(text: str) -> list[str]:
+    """Parse an archived key file from ``20-REGISTRO/claves/`` (``CABDC BCBDB ...``)."""
+    return _key_letters(text.splitlines())
+
+
+def parse_groups(value: str) -> dict[int, str]:
+    """Parse the ficha group syntax ``"1,3: label; 4-6: other"`` into ``{number: label}``."""
+    mapping: dict[int, str] = {}
+    for group in value.split(";"):
+        group = group.strip()
+        if not group:
+            continue
+        if ":" not in group:
+            raise ParseError(f"group missing ':': {group!r}")
+        numbers, label = group.split(":", 1)
+        for chunk in numbers.replace(" ", "").split(","):
+            if not chunk:
+                continue
+            if "-" in chunk:
+                start, end = (int(part) for part in chunk.split("-"))
+                for number in range(start, end + 1):
+                    mapping[number] = label.strip()
+            else:
+                mapping[int(chunk)] = label.strip()
+    return mapping
