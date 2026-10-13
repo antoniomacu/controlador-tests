@@ -22,6 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from bank_parser import parse_front_matter
 from ficha import FichaError, build_fields, ficha_id, merge_prepared, render
 
 ROOT = Path("~/Documents/controlador/Primer Examen").expanduser()
@@ -96,6 +97,25 @@ def run_registrar(ficha: Path, registrar: Path, excel: Path | None) -> subproces
     return subprocess.run(command, capture_output=True, text=True)
 
 
+def _is_filled(ficha: Path) -> bool:
+    return ficha.exists() and bool(
+        parse_front_matter(ficha.read_text(encoding="utf-8")).get("respuestas")
+    )
+
+
+def renumber(attempt: dict, fichas: Path) -> dict:
+    """Bump the attempt number past every ficha of this test that is already filled in.
+
+    The phone only knows its own history, so it numbers a test taken on paper earlier, or
+    retaken after the app's data was lost, as attempt 1. The vault is the authority on what
+    has been registered: the attempt takes the first free ``-i<N>`` slot.
+    """
+    numbered = dict(attempt)
+    while _is_filled(fichas / f"{ficha_id(numbered)}.md"):
+        numbered["attempt"] += 1
+    return numbered
+
+
 def import_attempts(
     attempts: list[dict], paths: Paths, runner: Runner = run_registrar
 ) -> list[str]:
@@ -103,7 +123,8 @@ def import_attempts(
     ledger = load_ledger(paths.ledger)
     subtipos = subtipos_by_question(paths.bank)
     registered: list[str] = []
-    for attempt in attempts:
+    for original in attempts:
+        attempt = renumber(original, paths.fichas)
         fid = ficha_id(attempt)
         target = paths.fichas / f"{fid}.md"
         previous = target.read_text(encoding="utf-8") if target.exists() else None
@@ -175,7 +196,7 @@ def main(argv: list[str] | None = None, runner: Runner = run_registrar) -> int:
         return 0
     print(f"{source.name}: {len(todo)} new attempt(s):")
     for attempt in todo:
-        print(_summary(attempt))
+        print(_summary(renumber(attempt, args.fichas)))
     if not args.yes:
         answer = input(f"¿Registrar {len(todo)} ficha(s) en el Excel? [s/N] ").strip().lower()
         if answer not in ("s", "si", "sí", "y", "yes"):

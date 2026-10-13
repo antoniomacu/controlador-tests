@@ -223,3 +223,26 @@ def test_round_trip_with_real_registrar_on_excel_copy(tmp_path):
     assert registered == [test_id]
     ids = [row[0].value for row in load_workbook(excel)["Nivel Test"].iter_rows(min_row=2)]
     assert test_id in ids
+
+
+def test_attempt_on_an_already_registered_test_gets_the_next_free_suffix(tmp_path):
+    paths = make_paths(tmp_path)
+    filled = "---\nid:            SYN-T9-001\nrespuestas:    CA\nclave:         CA\n---\n\nX\n"
+    (paths.fichas / "SYN-T9-001.md").write_text(filled, encoding="utf-8")
+    (paths.fichas / "SYN-T9-001-i2.md").write_text(
+        filled.replace("SYN-T9-001\n", "SYN-T9-001-i2\n"), encoding="utf-8"
+    )
+    calls: list[str] = []
+    registered = import_attempts([attempt("paper-done")], paths, runner=ok_runner(calls))
+    assert registered == ["SYN-T9-001-i3"]
+    text = (paths.fichas / "SYN-T9-001-i3.md").read_text(encoding="utf-8")
+    assert "intento:       3\n" in text
+    assert (paths.fichas / "SYN-T9-001.md").read_text(encoding="utf-8") == filled
+
+
+def test_app_numbering_restarted_after_reinstall_does_not_collide(tmp_path):
+    paths = make_paths(tmp_path)
+    import_attempts([attempt("first")], paths, runner=ok_runner([]))
+    calls: list[str] = []
+    import_attempts([attempt("after-reinstall")], paths, runner=ok_runner(calls))
+    assert calls == ["SYN-T9-001-i2.md"]
