@@ -301,6 +301,8 @@ passed in. That is what makes them deterministic and testable.
 
 ### 4.1 Home
 
+- All interface text is in **Spanish**, matching the questions, the causes vocabulary and the rest
+  of the study system.
 - A switch between **Temario** and **English**. English is empty in v1, but the app treats subjects
   generically so English needs only content.
 - The fixed tests, grouped by scope (T1, T2, T12…). Each row shows its status: not started, or the
@@ -452,8 +454,10 @@ Produced by the app, consumed on the Mac by `tools/import_results.py`.
 Field rules:
 
 - `uuid` uniquely identifies the attempt; it is what the Mac ledger records.
-- `kind` is `fixed` or `random`. Random attempts get a `test_id` such as `RND-T34-20261014-2030`
-  (chapters drawn, then date and time) and list their questions in `items`, in the order presented.
+- `kind` is `fixed` or `random`. Random attempts get a `test_id` such as
+  `RND-T34-20261014-203015` (chapters drawn, then date and time to the second, so two random tests
+  started in the same minute never share an ID) and list their questions in `items`, in the order
+  presented.
 - `attempt` is 1 for the first attempt on a fixed test, 2 for the second, and so on. Random attempts
   are always 1.
 - `key` stores the correct letter **at the time of the attempt**. If a later bank corrects a question,
@@ -462,6 +466,9 @@ Field rules:
   `first_answered_at_secs` is the attempt's elapsed time when it was first answered, used for
   `tramos`.
 - Only attempts with `status: finished` are exported; an attempt in progress is never exported.
+- Inside the app, each attempt additionally keeps a snapshot of its questions (stem, options,
+  explanation, citation, hook) and its pass reference. These app-only fields are not exported. They
+  are what keeps an old attempt fully reviewable after a later bank changes or removes a question.
 - **Every export contains every finished attempt ever made.** The Mac skips the ones it already
   registered. This means a lost or failed AirDrop never loses data and the user never has to track
   what was already sent.
@@ -499,11 +506,17 @@ For every finished attempt whose `uuid` is not in `app-sync/imported.json`:
    is empty (Claude prepares fichas in advance with key and subtipos), fill that file in, preserving
    its body text. Otherwise create a new one; for second and later attempts the name is
    `[test_id]-i[attempt].md`, for example `SYN-T4-001-i2.md`.
+
+   **Why the ID itself carries the suffix (amendment of 2026-10-13):** `registrar.py` forces
+   `intento = 9` for every synthetic test and refuses a row whose `id` and `intento` already exist
+   in the workbook. A second attempt at `SYN-T4-001` registered under the same `id` would therefore
+   always be rejected as a duplicate. Giving repeat attempts the `id` `SYN-T4-001-i2` keeps
+   `registrar.py` unchanged and keeps every attempt registrable.
 2. **Fill the fields**, all in the existing format:
 
    | Field | Value |
    |---|---|
-   | `id` | `test_id` |
+   | `id` | `test_id` for the first attempt; `test_id-i[attempt]` for later ones |
    | `categoria` | `SYN` for synthetic and random tests |
    | `dificultad` | `SINTETICO` |
    | `modo` | `Bloque` if one chapter, `Mixto` if several |
