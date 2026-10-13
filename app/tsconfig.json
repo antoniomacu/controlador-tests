@@ -10,7 +10,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true,
-    "types": ["vite/client", "vite-plugin-pwa/preact", "vitest/globals"]
+    "types": ["vite/client", "vite-plugin-pwa/preact", "vitest/globals", "node"]
   },
   "include": ["src", "tests", "vite.config.ts"]
 }
