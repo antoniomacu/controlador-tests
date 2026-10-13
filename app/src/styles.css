@@ -1,0 +1,51 @@
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --ok: #4ade80;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+}
+button {
+  font: inherit;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: var(--surface);
+  color: var(--text);
+}
+button:disabled { opacity: 0.4; }
+button[aria-pressed='true'], button[aria-selected='true'] { border-color: var(--accent); background: #0c4a6e; }
+.option, .test-row, .history-row { display: block; width: 100%; text-align: left; margin: 6px 0; }
+.test-row .id, .test-row .status { display: block; color: var(--muted); font-size: 14px; }
+.options { list-style: none; padding: 0; }
+.runner-bar { display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg); padding: 8px 0; }
+.clock { font-variant-numeric: tabular-nums; font-size: 22px; }
+.clock.overtime { color: var(--bad); }
+.flags, .runner-nav, .actions, .filters, .tabs, .sync { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px; }
+.cell.answered { border-color: var(--accent); }
+.cell.flagged { border-color: var(--warn); }
+.cell.current { outline: 2px solid var(--text); }
+.finish, .primary { background: var(--accent); color: #0f172a; border: none; }
+.banner { padding: 10px 12px; border-radius: 10px; background: var(--surface); }
+.banner.warn { border: 1px solid var(--warn); }
+.review { border-top: 1px solid #334155; padding: 12px 0; }
+.review .correct { color: var(--ok); }
+.review .chosen-wrong { color: var(--bad); text-decoration: line-through; }
+.cite, .hook { color: var(--muted); font-size: 15px; }
+.pass { color: var(--ok); }
+.fail { color: var(--bad); }
+.import input { display: block; }
