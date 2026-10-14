@@ -270,8 +270,13 @@ def _first_anchor(text: str) -> str:
 
 
 def _modern_block(number: int, answer: str, body: list[str]) -> EnglishSolution:
-    lines = [line for line in body if not line.lstrip().startswith(">")]
-    explanation = "\n".join(lines).strip()
+    # Drop only the quoted stem right after the heading; later quotes (examples) are content.
+    start = 0
+    while start < len(body) and not body[start].strip():
+        start += 1
+    while start < len(body) and body[start].lstrip().startswith(">"):
+        start += 1
+    explanation = "\n".join(body[start:]).strip()
     ancla = next((p for p in explanation.split("\n\n") if p.startswith("**Ancla:**")), "")
     subtipo = next((t for t in BACKTICK_RE.findall(ancla) if AREA_SUBTIPO_RE.match(t)), None)
     exam = EXAM_ANCHOR_RE.search(ancla)
@@ -287,6 +292,7 @@ def parse_english_solutions(section: str) -> dict[int, EnglishSolution]:
     paragraph holding the area-prefixed subtipo and, when there is one, the exam anchor.
     """
     solutions: dict[int, EnglishSolution] = {}
+    last: EnglishSolution | None = None
     for block in re.split(r"^---\s*$", section, flags=re.MULTILINE):
         lines = block.strip().splitlines()
         if not lines:
@@ -308,10 +314,16 @@ def parse_english_solutions(section: str) -> dict[int, EnglishSolution]:
             number = int(modern.group(1))
             solution = _modern_block(number, modern.group(2), lines[1:])
         else:
+            # A horizontal rule inside an explanation splits it: re-attach the continuation
+            # to the solution it belongs to instead of losing it. Text before the first
+            # solution (the section's introduction) is skipped.
+            if last is not None:
+                last.explanation = f"{last.explanation}\n\n---\n\n{block.strip()}"
             continue
         if number in solutions:
             raise ParseError(f"solution {number} appears twice")
         solutions[number] = solution
+        last = solution
     if not solutions:
         raise ParseError("no English solution blocks in a known layout")
     return solutions

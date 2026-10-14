@@ -69,3 +69,24 @@ def test_legacy_plural_anchors_keep_the_first_exam_anchor():
         "morfo-familia-lexica-confundible",
         "ING-26-001 Q66",
     )
+
+
+def test_only_the_quoted_stem_is_dropped_not_later_quotes():
+    block = (
+        "### 1. a) rose\n\n> *Prices _______ last winter.*\n\n**Ancla:** `morfo-x`.\n\n"
+        "**Ejemplo propio.**\n\n> *The sun rose behind the tower.*\n"
+    )
+    s = parse_english_solutions(block)[1]
+    assert "> *Prices" not in s.explanation
+    assert "> *The sun rose behind the tower.*" in s.explanation
+
+
+def test_a_rule_inside_an_explanation_does_not_cut_it():
+    section = (
+        "### 1. a) rose\n\n> *stem*\n\n**Ancla:** `morfo-x`.\n\nPrimera parte.\n\n---\n\n"
+        "Segunda parte tras una línea horizontal.\n\n---\n\n"
+        "### 2. b) told\n\n> *stem*\n\n**Ancla:** `lexico-y`.\n\nOtra.\n"
+    )
+    s = parse_english_solutions(section)
+    assert "Segunda parte tras una línea horizontal." in s[1].explanation
+    assert s[2].explanation.endswith("Otra.")
