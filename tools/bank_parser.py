@@ -241,3 +241,89 @@ def parse_solutions(section: str) -> dict[int, ParsedSolution]:
         answer, cite, level = found
         solutions[number] = ParsedSolution(number, answer, cite.strip(), level, explanation, hook)
     return solutions
+
+
+AREAS = ("verbal", "nofin", "condic", "modal", "estruc", "detpro", "conpre", "lexico", "morfo")
+AREA_SUBTIPO_RE = re.compile(rf"^(?:{'|'.join(AREAS)})-[a-z0-9-]+$")
+EN_LEGACY_RE = re.compile(
+    r"^\*\*(\d+)\.\s*([a-d])\)\s*(.*?)\*\*\s*·\s*(N[123])\s*·\s*`([^`]+)`\s*·\s*\[anclas?:\s*([^\]]+)\]"
+)
+EN_MODERN_RE = re.compile(r"^###\s+(\d+)\.\s*([a-d])\)\s*(.*)$")
+EXAM_ANCHOR_RE = re.compile(r"ING-(?:\d{2}|PR)-\d{3}\s+Q\d+")
+BACKTICK_RE = re.compile(r"`([^`]+)`")
+
+
+@dataclass
+class EnglishSolution:
+    number: int
+    answer: str
+    level: str | None
+    subtipo: str | None
+    ref: str | None
+    explanation: str
+
+
+def _first_anchor(text: str) -> str:
+    """The first exam anchor in ``text`` (``ING-26-001 Q66 y ING-26-002 Q63`` → the first)."""
+    exam = EXAM_ANCHOR_RE.search(text)
+    return " ".join(exam.group(0).split()) if exam else " ".join(text.split())
+
+
+def _modern_block(number: int, answer: str, body: list[str]) -> EnglishSolution:
+    # Drop only the quoted stem right after the heading; later quotes (examples) are content.
+    start = 0
+    while start < len(body) and not body[start].strip():
+        start += 1
+    while start < len(body) and body[start].lstrip().startswith(">"):
+        start += 1
+    explanation = "\n".join(body[start:]).strip()
+    ancla = next((p for p in explanation.split("\n\n") if p.startswith("**Ancla:**")), "")
+    subtipo = next((t for t in BACKTICK_RE.findall(ancla) if AREA_SUBTIPO_RE.match(t)), None)
+    exam = EXAM_ANCHOR_RE.search(ancla)
+    ref = " ".join(exam.group(0).split()) if exam else subtipo
+    return EnglishSolution(number, answer, None, subtipo, ref, explanation)
+
+
+def parse_english_solutions(section: str) -> dict[int, EnglishSolution]:
+    """Parse English ``## SOLUCIONES RAZONADAS`` in the legacy or the modern layout.
+
+    Legacy (``SYN-ING-001``): ``**1. a) illegible** · N1 · `subtipo` · [ancla: ING-18-003 Q33]``.
+    Modern (``SYN-ING-002``+): ``### 1. a) rose`` heading, a quoted stem, then an ``**Ancla:**``
+    paragraph holding the area-prefixed subtipo and, when there is one, the exam anchor.
+    """
+    solutions: dict[int, EnglishSolution] = {}
+    last: EnglishSolution | None = None
+    for block in re.split(r"^---\s*$", section, flags=re.MULTILINE):
+        lines = block.strip().splitlines()
+        if not lines:
+            continue
+        head = lines[0].strip()
+        legacy = EN_LEGACY_RE.match(head)
+        modern = EN_MODERN_RE.match(head)
+        if legacy:
+            number = int(legacy.group(1))
+            solution = EnglishSolution(
+                number,
+                legacy.group(2),
+                legacy.group(4),
+                legacy.group(5),
+                _first_anchor(legacy.group(6)),
+                "\n".join(lines[1:]).strip(),
+            )
+        elif modern:
+            number = int(modern.group(1))
+            solution = _modern_block(number, modern.group(2), lines[1:])
+        else:
+            # A horizontal rule inside an explanation splits it: re-attach the continuation
+            # to the solution it belongs to instead of losing it. Text before the first
+            # solution (the section's introduction) is skipped.
+            if last is not None:
+                last.explanation = f"{last.explanation}\n\n---\n\n{block.strip()}"
+            continue
+        if number in solutions:
+            raise ParseError(f"solution {number} appears twice")
+        solutions[number] = solution
+        last = solution
+    if not solutions:
+        raise ParseError("no English solution blocks in a known layout")
+    return solutions

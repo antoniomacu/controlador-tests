@@ -2,7 +2,14 @@ import { useState } from 'preact/hooks';
 import { isWrong, setCause } from '../domain/attempts';
 import { passes, score } from '../domain/scoring';
 import { formatClock } from '../domain/timer';
-import { CAUSES, LETTERS, type Attempt, type Cause, type Item, type Letter } from '../domain/types';
+import {
+  CAUSES_BY_SUBJECT,
+  LETTERS,
+  type Attempt,
+  type Cause,
+  type Item,
+  type Letter,
+} from '../domain/types';
 import { Markdown } from './Markdown';
 
 type Filter = 'all' | 'wrong' | 'blank' | 'doubt';
@@ -83,7 +90,9 @@ export function Results({ attempt: a, onChange, onHome }: ResultsProps) {
                 </li>
               ))}
             </ol>
-            {q.cite && <p class="cite">{`[${q.cite}] · ${q.level}`}</p>}
+            {(q.ref ?? q.cite) && (
+              <p class="cite">{`[${q.ref ?? q.cite}]${q.level ? ` · ${q.level}` : ''}`}</p>
+            )}
             {q.explanation && <Markdown text={q.explanation} />}
             {q.hook && (
               <div class="hook">
@@ -101,7 +110,7 @@ export function Results({ attempt: a, onChange, onHome }: ResultsProps) {
                   }}
                 >
                   <option value="">—</option>
-                  {CAUSES.map((cause) => (
+                  {CAUSES_BY_SUBJECT[a.subject].map((cause) => (
                     <option key={cause} value={cause}>
                       {cause}
                     </option>

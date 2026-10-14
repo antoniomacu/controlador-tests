@@ -91,13 +91,15 @@ def test_build_bank_and_cli(tmp_path):
     for name in ("SYN-T9-001.md", "SYN-T8-001.md"):
         (syn / name).write_text((FIX / name).read_text(encoding="utf-8"), encoding="utf-8")
     bank = build_bank(syn, FIX / "claves", FIX / "fichas", "2026-10-13T18:00:00+02:00")
-    assert bank["schema"] == 1
+    assert bank["schema"] == 2
     assert [t["id"] for t in bank["tests"]] == ["SYN-T8-001", "SYN-T9-001"]
     assert len(bank["questions"]) == 4
 
     out = tmp_path / "out" / "bank.json"
     args = ["--sinteticos", str(syn), "--claves", str(FIX / "claves")]
     args += ["--fichas", str(FIX / "fichas"), "--out", str(out)]
+    args += ["--ingles-sinteticos", str(tmp_path), "--ingles-claves", str(tmp_path)]
+    args += ["--ingles-fichas", str(tmp_path)]
     assert main(args) == 0
     assert json.loads(out.read_text(encoding="utf-8"))["tests"][0]["id"] == "SYN-T8-001"
 
@@ -112,6 +114,8 @@ def test_cli_returns_1_and_writes_nothing_on_error(tmp_path, capsys):
     out = tmp_path / "bank.json"
     args = ["--sinteticos", str(syn), "--claves", str(claves)]
     args += ["--fichas", str(tmp_path), "--out", str(out)]
+    args += ["--ingles-sinteticos", str(tmp_path), "--ingles-claves", str(tmp_path)]
+    args += ["--ingles-fichas", str(tmp_path)]
     assert main(args) == 1
     assert "ERROR" in capsys.readouterr().err
     assert not out.exists()
@@ -138,3 +142,34 @@ def test_non_canonical_alcance_falls_back_to_the_id():
     text = MODERN.replace("alcance: T9", "alcance: T1 + T9")
     test, _ = build_test("SYN-T19-001", text, ["c", "a"], {1: "t1-x", 2: "t9-y"})
     assert test["scope"] == "T19"
+
+
+def test_temario_questions_carry_group_and_ref():
+    _, questions = build_test("SYN-T9-001", MODERN, ["c", "a"], {})
+    assert (questions[0]["group"], questions[0]["ref"]) == ("9", "T9, pág. 3")
+
+
+def test_bank_is_schema_2_with_temario_group_labels(tmp_path):
+    syn = tmp_path / "syn"
+    syn.mkdir()
+    (syn / "SYN-T9-001.md").write_text(MODERN, encoding="utf-8")
+    bank = build_bank(syn, FIX / "claves", FIX / "fichas", "x")
+    assert bank["schema"] == 2
+    assert bank["groups"]["temario"] == {"9": "Tema 9: Prueba"}
+
+
+def test_full_syllabus_tests_are_built(tmp_path):
+    syn, claves, fichas = tmp_path / "syn", tmp_path / "claves", tmp_path / "fichas"
+    for d in (syn, claves, fichas):
+        d.mkdir()
+    (syn / "SYN-FULL-901.md").write_text(
+        MODERN.replace("alcance: T9", "alcance: FULL"), encoding="utf-8"
+    )
+    (syn / "SYN-ING-777.md").write_text("not temario", encoding="utf-8")
+    (claves / "SYN-FULL-901.txt").write_text("CA", encoding="utf-8")
+    (fichas / "SYN-FULL-901.md").write_text(
+        "---\nsubtipos:      1: t1-a; 2: t9-b\n---\n", encoding="utf-8"
+    )
+    bank = build_bank(syn, claves, fichas, "x")
+    assert [t["id"] for t in bank["tests"]] == ["SYN-FULL-901"]
+    assert [q["group"] for q in bank["questions"]] == ["1", "9"]

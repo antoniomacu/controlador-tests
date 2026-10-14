@@ -3,13 +3,15 @@ import type { Attempt, Bank } from '../../src/domain/types';
 import { Home } from '../../src/ui/Home';
 
 const bank: Bank = {
-  schema: 1,
+  schema: 2,
   built: 'x',
+  groups: { temario: { '4': 'Tema 4' }, ingles: {} },
   questions: [
     {
       id: 'A#1',
       subject: 'temario',
       tema: 4,
+      group: '4',
       stem: 's',
       answer: 'a',
       level: 'N1',

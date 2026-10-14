@@ -15,7 +15,13 @@ import type { Attempt, Bank } from '../../src/domain/types';
 let n = 0;
 const fresh = () => openAppDb(`test-db-${n++}`);
 
-const bank = { schema: 1, built: 'x', questions: [], tests: [] } as Bank;
+const bank = {
+  schema: 2,
+  built: 'x',
+  groups: { temario: {}, ingles: {} },
+  questions: [],
+  tests: [],
+} as Bank;
 const attempt = (uuid: string, started: string) => ({ uuid, started }) as unknown as Attempt;
 
 describe('db', () => {

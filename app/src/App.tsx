@@ -6,7 +6,7 @@ import {
   markExported,
   nextAttemptNumber,
 } from './domain/attempts';
-import { summarizeBankChange } from './domain/bank';
+import { summarizeBankChange, validateBank } from './domain/bank';
 import type { Attempt, Bank, Subject } from './domain/types';
 import {
   deleteAttempt,
@@ -64,7 +64,10 @@ export function App({
   // Startup: resume an open attempt, or finish it if an exam expired while the app was closed.
   useEffect(() => {
     void (async () => {
-      const storedBank = await getBank(db);
+      // A bank stored by an older app version (schema 1) is upgraded in memory on load.
+      const rawBank = await getBank(db);
+      const checked = rawBank ? validateBank(rawBank) : null;
+      const storedBank = checked?.ok ? checked.bank : null;
       let stored = await listAttempts(db);
       const open = stored.find((a) => a.status === 'in_progress');
       if (open) {

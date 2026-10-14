@@ -14,6 +14,7 @@ const q = (n: number, answer: 'a' | 'b'): Question => ({
   id: `X#${n}`,
   subject: 'temario',
   tema: 1,
+  group: '1',
   stem: `Enunciado ${n}`,
   answer,
   level: 'N2',
@@ -86,5 +87,17 @@ describe('Results', () => {
     expect(selects).toHaveLength(2);
     fireEvent.change(selects[0], { target: { value: 'Confundí dos conceptos' } });
     expect(onChange.mock.calls[0][0].items[1].cause).toBe('Confundí dos conceptos');
+  });
+
+  it('offers the English causes on an English attempt and shows the anchor without level', () => {
+    const a = { ...finished(), subject: 'ingles' as const };
+    a.questions = a.questions.map((q) => ({ ...q, ref: 'ING-24-002 Q67', level: null, cite: null }));
+    render(<Results attempt={a} onChange={vi.fn()} onHome={vi.fn()} />);
+    expect(screen.getAllByText('[ING-24-002 Q67]')).toHaveLength(3);
+    const options = Array.from(screen.getAllByRole('combobox')[0].querySelectorAll('option')).map(
+      (o) => o.textContent,
+    );
+    expect(options).toContain('Aplique mal la regla');
+    expect(options).not.toContain('Confundí dos conceptos');
   });
 });

@@ -181,6 +181,7 @@ function toExport(a: Attempt): ExportAttempt {
     limit_min: a.limit_min,
     total_secs: a.total_secs,
     status: a.status,
+    subject: a.subject,
     items: a.items,
   };
 }

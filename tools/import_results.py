@@ -24,6 +24,7 @@ from pathlib import Path
 
 from bank_parser import parse_front_matter
 from ficha import FichaError, build_fields, ficha_id, merge_prepared, render
+from profiles import PROFILES, subject_of
 
 ROOT = Path("~/Documents/controlador/Primer Examen").expanduser()
 VAULT = Path("~/Documents/TheMind/ATC/teoria").expanduser()
@@ -35,13 +36,20 @@ class ResultsError(ValueError):
 
 
 @dataclass
-class Paths:
+class Route:
+    """Where one subject's fichas live, which registrar writes them, and to which workbook."""
+
     fichas: Path
+    registrar: Path
+    excel: Path | None
+
+
+@dataclass
+class Paths:
     ledger: Path
     archive: Path
     bank: Path
-    registrar: Path
-    excel: Path | None
+    routes: dict[str, Route]
 
 
 Runner = Callable[[Path, Path, Path | None], subprocess.CompletedProcess]
@@ -116,20 +124,48 @@ def renumber(attempt: dict, fichas: Path) -> dict:
     return numbered
 
 
+def workbook_open(path: Path) -> bool:
+    """True when Excel holds the workbook: its ``~$`` lock file exists or ``lsof`` lists it."""
+    if (path.parent / f"~${path.name}").exists():
+        return True
+    if not path.exists():
+        return False
+    return subprocess.run(["lsof", "-t", str(path)], capture_output=True).returncode == 0
+
+
+def _guard(attempts: list[dict], paths: Paths, is_open: Callable[[Path], bool]) -> None:
+    """Refuse to start if Excel holds the workbook of any subject about to be imported.
+
+    A workbook saved by Excel after ``registrar.py`` wrote to it would silently drop the new
+    rows. Only the subjects present in ``attempts`` are checked, so an unrelated open workbook
+    does not block the run.
+    """
+    for subject in sorted({subject_of(a) for a in attempts}):
+        excel = paths.routes[subject].excel or PROFILES[subject].excel
+        if is_open(excel):
+            raise ResultsError(f"{excel.name} está abierto en Excel: ciérralo y vuelve a ejecutar.")
+
+
 def import_attempts(
-    attempts: list[dict], paths: Paths, runner: Runner = run_registrar
+    attempts: list[dict],
+    paths: Paths,
+    runner: Runner = run_registrar,
+    is_open: Callable[[Path], bool] = workbook_open,
 ) -> list[str]:
     """Write and register one ficha per attempt; return the registered ficha IDs."""
+    _guard(attempts, paths, is_open)
     ledger = load_ledger(paths.ledger)
     subtipos = subtipos_by_question(paths.bank)
     registered: list[str] = []
     for original in attempts:
-        attempt = renumber(original, paths.fichas)
+        subject = subject_of(original)
+        route, profile = paths.routes[subject], PROFILES[subject]
+        attempt = renumber(original, route.fichas)
         fid = ficha_id(attempt)
-        target = paths.fichas / f"{fid}.md"
+        target = route.fichas / f"{fid}.md"
         previous = target.read_text(encoding="utf-8") if target.exists() else None
         try:
-            fields = build_fields(attempt, subtipos)
+            fields = build_fields(attempt, subtipos, profile)
             text = (
                 merge_prepared(previous, fields)
                 if previous is not None
@@ -139,7 +175,7 @@ def import_attempts(
             raise ResultsError(f"{fid}: {error}") from error
         target.write_text(text, encoding="utf-8")
 
-        result = runner(target, paths.registrar, paths.excel)
+        result = runner(target, route.registrar, route.excel)
         if result.returncode != 0:
             if previous is None:
                 target.unlink()
@@ -166,17 +202,28 @@ def _summary(attempt: dict) -> str:
     )
 
 
-def main(argv: list[str] | None = None, runner: Runner = run_registrar) -> int:
+def main(
+    argv: list[str] | None = None,
+    runner: Runner = run_registrar,
+    is_open: Callable[[Path], bool] = workbook_open,
+) -> int:
     parser = argparse.ArgumentParser(description="Register app results via registrar.py.")
     parser.add_argument("--results", type=Path, default=None)
     parser.add_argument("--yes", action="store_true", help="Do not ask for confirmation")
-    parser.add_argument("--fichas", type=Path, default=VAULT / "20-REGISTRO/fichas")
+    parser.add_argument("--fichas", type=Path, default=PROFILES["temario"].fichas)
+    parser.add_argument("--ingles-fichas", type=Path, default=PROFILES["ingles"].fichas)
     parser.add_argument("--ledger", type=Path, default=SYNC / "imported.json")
     parser.add_argument("--archive", type=Path, default=SYNC / "results")
     parser.add_argument("--bank", type=Path, default=SYNC / "bank.json")
-    parser.add_argument("--registrar", type=Path, default=VAULT / "99-SCRIPTS/registrar.py")
+    parser.add_argument("--registrar", type=Path, default=PROFILES["temario"].registrar)
+    parser.add_argument("--ingles-registrar", type=Path, default=PROFILES["ingles"].registrar)
     parser.add_argument("--excel", type=Path, default=None)
+    parser.add_argument("--ingles-excel", type=Path, default=None)
     args = parser.parse_args(argv)
+    routes = {
+        "temario": Route(args.fichas, args.registrar, args.excel),
+        "ingles": Route(args.ingles_fichas, args.ingles_registrar, args.ingles_excel),
+    }
 
     try:
         source = args.results or find_results(Path("~/Downloads").expanduser())
@@ -196,16 +243,17 @@ def main(argv: list[str] | None = None, runner: Runner = run_registrar) -> int:
         return 0
     print(f"{source.name}: {len(todo)} new attempt(s):")
     for attempt in todo:
-        print(_summary(renumber(attempt, args.fichas)))
+        subject = subject_of(attempt)
+        print(f"[{subject}]" + _summary(renumber(attempt, routes[subject].fichas)))
     if not args.yes:
         answer = input(f"¿Registrar {len(todo)} ficha(s) en el Excel? [s/N] ").strip().lower()
         if answer not in ("s", "si", "sí", "y", "yes"):
             print("Cancelado. No se ha registrado nada.")
             return 0
 
-    paths = Paths(args.fichas, args.ledger, args.archive, args.bank, args.registrar, args.excel)
+    paths = Paths(args.ledger, args.archive, args.bank, routes)
     try:
-        registered = import_attempts(todo, paths, runner=runner)
+        registered = import_attempts(todo, paths, runner=runner, is_open=is_open)
     except ResultsError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

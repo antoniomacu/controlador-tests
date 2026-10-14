@@ -4,12 +4,14 @@ import type { Bank } from '../src/domain/types';
 import { listAttempts, openAppDb, putBank, type Db } from '../src/storage/db';
 
 const bank: Bank = {
-  schema: 1,
+  schema: 2,
   built: '2026-10-13T18:00:00+02:00',
+  groups: { temario: { '4': 'Tema 4' }, ingles: {} },
   questions: [1, 2].map((n) => ({
     id: `SYN-T4-001#${n}`,
     subject: 'temario' as const,
     tema: 4,
+    group: '4',
     stem: `Enunciado ${n}`,
     answer: 'a' as const,
     level: 'N1' as const,
@@ -118,6 +120,21 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: /Tema 4/ })).toBeTruthy();
     await waitFor(async () => expect(await listAttempts(db)).toHaveLength(0));
     expect(screen.getByText('Sin hacer')).toBeTruthy();
+  });
+
+  it('keeps working with a schema-1 bank stored before the update', async () => {
+    const v1 = {
+      ...bank,
+      schema: 1,
+      groups: undefined,
+      questions: bank.questions.map(({ group: _g, ...q }) => ({ ...q, cite: 'T4, pág. 1' })),
+    };
+    await putBank(db, v1 as never);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Práctica aleatoria' }));
+    fireEvent.click(screen.getByLabelText(/Tema 4/));
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+    expect(await screen.findByText(/Enunciado/)).toBeTruthy();
   });
 
   it('keeps the old bank when an invalid file is imported', async () => {
