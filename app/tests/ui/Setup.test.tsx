@@ -15,8 +15,13 @@ const q = (id: string, tema: number): Question => ({
 const bank: Bank = {
   schema: 2,
   built: 'x',
-  groups: { temario: { '3': 'Tema 3', '4': 'Tema 4' }, ingles: {} },
-  questions: [q('A#1', 3), q('A#2', 3), q('B#1', 4)],
+  groups: { temario: { '3': 'Tema 3', '4': 'Tema 4' }, ingles: { morfo: 'Morfología' } },
+  questions: [
+    q('A#1', 3),
+    q('A#2', 3),
+    q('B#1', 4),
+    { ...q('E#1', 0), subject: 'ingles', tema: null, group: 'morfo' },
+  ],
   tests: [
     {
       id: 'SYN-T3-001',
@@ -90,7 +95,7 @@ describe('Setup', () => {
     );
     const start = screen.getByRole('button', { name: 'Empezar' }) as HTMLButtonElement;
     expect(start.disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText('Tema 3'));
+    fireEvent.click(screen.getByLabelText('Tema 3 (2)'));
     fireEvent.click(start);
     const input = onBegin.mock.calls[0][0];
     expect(input).toMatchObject({
@@ -101,5 +106,31 @@ describe('Setup', () => {
       passRef: 1,
     });
     expect(input.questions).toHaveLength(2);
+  });
+});
+
+describe('Setup in English', () => {
+  it('offers areas with labels and builds an RND-ING test', () => {
+    const onBegin = vi.fn<(i: BeginInput) => void>();
+    render(
+      <Setup
+        bank={bank}
+        subject="ingles"
+        test={null}
+        attemptNumber={1}
+        now={now}
+        onBegin={onBegin}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText(/Tema 3/)).toBeNull();
+    fireEvent.click(screen.getByLabelText('Morfología (1)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+    expect(onBegin.mock.calls[0][0]).toMatchObject({
+      testId: 'RND-ING-20261014-203015',
+      kind: 'random',
+      subject: 'ingles',
+      title: 'Práctica aleatoria — Morfología',
+    });
   });
 });

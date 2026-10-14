@@ -15,39 +15,34 @@ export function mulberry32(seed: number): () => number {
 function pick(
   questions: readonly Question[],
   subject: Subject,
-  temas: readonly number[],
+  groups: readonly string[],
 ): Question[] {
-  const wanted = new Set(temas);
-  return questions.filter((x) => x.subject === subject && x.tema !== null && wanted.has(x.tema));
+  const wanted = new Set(groups);
+  return questions.filter((x) => x.subject === subject && wanted.has(x.group));
 }
 
-export function temasOf(questions: readonly Question[], subject: Subject): number[] {
-  return [
-    ...new Set(
-      questions
-        .filter((x) => x.subject === subject)
-        .flatMap((x) => (x.tema === null ? [] : [x.tema])),
-    ),
-  ].sort(
-    (a, b) => a - b,
+/** Groups (chapters or English areas) that have questions, chapters in numeric order. */
+export function groupsOf(questions: readonly Question[], subject: Subject): string[] {
+  return [...new Set(questions.filter((x) => x.subject === subject).map((x) => x.group))].sort(
+    (a, b) => a.localeCompare(b, undefined, { numeric: true }),
   );
 }
 
 export function availableCount(
   questions: readonly Question[],
   subject: Subject,
-  temas: readonly number[],
+  groups: readonly string[],
 ): number {
-  return pick(questions, subject, temas).length;
+  return pick(questions, subject, groups).length;
 }
 
 /** Fisher-Yates shuffle of the matching questions, then the first `count`. */
 export function sampleQuestions(
   questions: readonly Question[],
-  opts: { subject: Subject; temas: readonly number[]; count: number; seed: number },
+  opts: { subject: Subject; groups: readonly string[]; count: number; seed: number },
 ): Question[] {
   if (opts.count < 1) throw new Error('count must be at least 1');
-  const candidates = pick(questions, opts.subject, opts.temas);
+  const candidates = pick(questions, opts.subject, opts.groups);
   const rand = mulberry32(opts.seed);
   for (let i = candidates.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rand() * (i + 1));
@@ -58,10 +53,16 @@ export function sampleQuestions(
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** `RND-T34-20261014-203015`: chapters, then local date and time to the second. */
-export function randomTestId(temas: readonly number[], date: Date): string {
-  const digits = [...new Set(temas)].sort((a, b) => a - b).join('');
+/**
+ * `RND-T34-20261014-203015` for Temario (chapters drawn), `RND-ING-20261014-203015` for English
+ * (areas are not encoded: nine possible prefixes would make the ID unwieldy).
+ */
+export function randomTestId(subject: Subject, groups: readonly string[], date: Date): string {
+  const head =
+    subject === 'ingles'
+      ? 'RND-ING'
+      : `RND-T${[...new Set(groups)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join('')}`;
   const day = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
   const time = `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-  return `RND-T${digits}-${day}-${time}`;
+  return `${head}-${day}-${time}`;
 }

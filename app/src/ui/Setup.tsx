@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { availableCount, randomTestId, sampleQuestions, temasOf } from '../domain/sampler';
+import { availableCount, groupsOf, randomTestId, sampleQuestions } from '../domain/sampler';
 import type { Bank, Mode, Question, Subject, TestDef } from '../domain/types';
 
 export interface BeginInput {
@@ -23,18 +23,19 @@ interface SetupProps {
   onCancel: () => void;
 }
 
-/** Mode choice for a fixed test, or chapters and count for random practice. */
+/** Mode choice for a fixed test, or groups (chapters or English areas) and count for random practice. */
 export function Setup({ bank, subject, test, attemptNumber, now, onBegin, onCancel }: SetupProps) {
   const [mode, setMode] = useState<Mode>('exam');
-  const [temas, setTemas] = useState<number[]>([]);
+  const [groups, setGroups] = useState<string[]>([]);
   const [count, setCount] = useState(20);
-  const available = availableCount(bank.questions, subject, temas);
+  const available = availableCount(bank.questions, subject, groups);
+  const labelOf = (g: string) => bank.groups[subject]?.[g] ?? g;
   const effective = Math.max(0, Math.min(count, available));
   const limit = test ? test.limit_min : effective;
   const canStart = test !== null || effective > 0;
 
-  const toggleTema = (tema: number) =>
-    setTemas(temas.includes(tema) ? temas.filter((t) => t !== tema) : [...temas, tema]);
+  const toggleGroup = (g: string) =>
+    setGroups(groups.includes(g) ? groups.filter((x) => x !== g) : [...groups, g]);
 
   const begin = () => {
     if (test) {
@@ -54,14 +55,14 @@ export function Setup({ bank, subject, test, attemptNumber, now, onBegin, onCanc
     const nowMs = now();
     const questions = sampleQuestions(bank.questions, {
       subject,
-      temas,
+      groups,
       count: effective,
       seed: nowMs,
     });
-    const sorted = [...temas].sort((a, b) => a - b);
+    const chosen = groupsOf(bank.questions, subject).filter((g) => groups.includes(g));
     onBegin({
-      testId: randomTestId(sorted, new Date(nowMs)),
-      title: `Práctica aleatoria — temas ${sorted.join(', ')}`,
+      testId: randomTestId(subject, chosen, new Date(nowMs)),
+      title: `Práctica aleatoria — ${chosen.map(labelOf).join(', ')}`,
       subject,
       kind: 'random',
       mode,
@@ -102,15 +103,15 @@ export function Setup({ bank, subject, test, attemptNumber, now, onBegin, onCanc
 
       {!test && (
         <fieldset>
-          <legend>Temas</legend>
-          {temasOf(bank.questions, subject).map((tema) => (
-            <label key={tema}>
+          <legend>{subject === 'ingles' ? 'Áreas' : 'Temas'}</legend>
+          {groupsOf(bank.questions, subject).map((g) => (
+            <label key={g}>
               <input
                 type="checkbox"
-                checked={temas.includes(tema)}
-                onChange={() => toggleTema(tema)}
+                checked={groups.includes(g)}
+                onChange={() => toggleGroup(g)}
               />
-              {`Tema ${tema}`}
+              {`${labelOf(g)} (${availableCount(bank.questions, subject, [g])})`}
             </label>
           ))}
           <label>
