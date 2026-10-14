@@ -122,6 +122,21 @@ describe('App', () => {
     expect(screen.getByText('Sin hacer')).toBeTruthy();
   });
 
+  it('keeps working with a schema-1 bank stored before the update', async () => {
+    const v1 = {
+      ...bank,
+      schema: 1,
+      groups: undefined,
+      questions: bank.questions.map(({ group: _g, ...q }) => ({ ...q, cite: 'T4, pág. 1' })),
+    };
+    await putBank(db, v1 as never);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Práctica aleatoria' }));
+    fireEvent.click(screen.getByLabelText(/Tema 4/));
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+    expect(await screen.findByText(/Enunciado/)).toBeTruthy();
+  });
+
   it('keeps the old bank when an invalid file is imported', async () => {
     const { container } = mount();
     await screen.findByRole('button', { name: /Tema 4/ });
