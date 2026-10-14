@@ -21,7 +21,9 @@ import sys
 from pathlib import Path
 
 from bank_parser import (
+    AREAS,
     ParseError,
+    parse_english_solutions,
     parse_front_matter,
     parse_groups,
     parse_key,
@@ -38,6 +40,21 @@ DEFAULT_SINTETICOS = ROOT / "Temario/Tests/SINTETICOS"
 DEFAULT_CLAVES = VAULT / "claves"
 DEFAULT_FICHAS = VAULT / "fichas"
 DEFAULT_OUT = ROOT / "app-sync/bank.json"
+IVAULT = Path("~/Documents/TheMind/ATC/ingles/20-REGISTRO").expanduser()
+DEFAULT_ING_SINTETICOS = ROOT / "Ingles/tests/SINTETICOS"
+DEFAULT_ING_CLAVES = IVAULT / "claves"
+DEFAULT_ING_FICHAS = IVAULT / "fichas"
+AREA_LABELS = {
+    "verbal": "Sistema verbal",
+    "nofin": "Formas no personales",
+    "condic": "Condicionales e irreales",
+    "modal": "Modales y perífrasis",
+    "estruc": "Estructura y orden",
+    "detpro": "Determinantes, pronombres y relativos",
+    "conpre": "Conectores y preposiciones",
+    "lexico": "Léxico y colocación",
+    "morfo": "Morfología",
+}
 
 SCOPE_FROM_ID = re.compile(r"^SYN-(T\d+|FULL)-\d{3}$")
 SUBTIPO_TEMA = re.compile(r"^t(\d)-")
@@ -124,12 +141,14 @@ def build_test(
                 "id": f"{test_id}#{question.number}",
                 "subject": "temario",
                 "tema": tema,
+                "group": str(tema),
                 "stem": question.stem,
                 "options": question.options,
                 "answer": solution.answer,
                 "level": solution.level,
                 "subtipo": subtipo,
                 "cite": solution.cite,
+                "ref": solution.cite,
                 "explanation": solution.explanation,
                 "hook": solution.hook,
             }
@@ -155,16 +174,84 @@ def _subtipos_from_ficha(path: Path) -> dict[int, str]:
     return parse_groups(value)
 
 
-def build_bank(sinteticos: Path, claves: Path, fichas: Path, built: str) -> dict:
-    """Build the whole bank from every ``SYN-*.md`` in ``sinteticos``."""
-    tests: list[dict] = []
-    questions: list[dict] = []
-    for path in sorted(sinteticos.glob("SYN-*.md")):
+def build_english_test(
+    test_id: str, text: str, key_file: list[str], subtipos: dict[int, str]
+) -> tuple[dict, list[dict]]:
+    """Parse and cross-check one English synthetic test; same guarantees as ``build_test``."""
+    front = parse_front_matter(text)
+    sections = split_sections(text)
+    try:
+        questions = parse_questions(_required_section(sections, "TEST", test_id))
+        key = parse_key(_required_section(sections, "CLAVE", test_id))
+        solutions = parse_english_solutions(
+            _required_section(sections, "SOLUCIONES RAZONADAS", test_id)
+        )
+    except ParseError as error:
+        if str(error).startswith(test_id):
+            raise
+        raise ParseError(f"{test_id}: {error}") from error
+
+    n = len(questions)
+    declared = _leading_int(front.get("preguntas"))
+    if declared is not None and declared != n:
+        raise ParseError(f"{test_id}: declares {declared} questions but has {n}")
+    if len(key) != n:
+        raise ParseError(f"{test_id}: key has {len(key)} letters for {n} questions")
+    if key != key_file:
+        raise ParseError(f"{test_id}: CLAVE section disagrees with claves file")
+    if sorted(solutions) != list(range(1, n + 1)):
+        raise ParseError(f"{test_id}: solutions found for {sorted(solutions)}, expected 1..{n}")
+
+    entries: list[dict] = []
+    for question in questions:
+        sol = solutions[question.number]
+        if sol.answer != key[question.number - 1]:
+            raise ParseError(
+                f"{test_id} question {question.number}: solution says {sol.answer}, "
+                f"key says {key[question.number - 1]}"
+            )
+        subtipo = subtipos.get(question.number) or sol.subtipo
+        area = (subtipo or "").split("-", 1)[0]
+        if area not in AREAS:
+            raise ParseError(
+                f"{test_id} question {question.number}: no subtipo with a valid area prefix"
+            )
+        entries.append(
+            {
+                "id": f"{test_id}#{question.number}",
+                "subject": "ingles",
+                "tema": None,
+                "group": area,
+                "stem": question.stem,
+                "options": question.options,
+                "answer": sol.answer,
+                "level": sol.level,
+                "subtipo": subtipo,
+                "ref": sol.ref or subtipo,
+                "explanation": sol.explanation,
+                "hook": None,
+            }
+        )
+    test = {
+        "id": test_id,
+        "subject": "ingles",
+        "scope": "ING",
+        "title": parse_title(text) or test_id,
+        "questions": [e["id"] for e in entries],
+        "limit_min": _leading_int(front.get("tiempo")) or n,
+        "pass_ref": _leading_int(front.get("aprobado_referencia")) or n // 2,
+        "synthetic": True,
+    }
+    return test, entries
+
+
+def _collect(sinteticos, claves, fichas, pattern, builder, tests, questions) -> None:
+    for path in sorted(sinteticos.glob(pattern)):
         test_id = path.stem
         key_path = claves / f"{test_id}.txt"
         if not key_path.exists():
             raise ParseError(f"{test_id}: no key file at {key_path}")
-        test, entries = build_test(
+        test, entries = builder(
             test_id,
             path.read_text(encoding="utf-8"),
             parse_key_file(key_path.read_text(encoding="utf-8")),
@@ -172,7 +259,31 @@ def build_bank(sinteticos: Path, claves: Path, fichas: Path, built: str) -> dict
         )
         tests.append(test)
         questions.extend(entries)
-    return {"schema": 1, "built": built, "questions": questions, "tests": tests}
+
+
+def build_bank(
+    sinteticos: Path,
+    claves: Path,
+    fichas: Path,
+    built: str,
+    ingles: tuple[Path, Path, Path] | None = None,
+) -> dict:
+    """Build the bank (schema 2) from Temario ``SYN-T*`` and, optionally, English ``SYN-ING-*``."""
+    tests: list[dict] = []
+    questions: list[dict] = []
+    _collect(sinteticos, claves, fichas, "SYN-T*.md", build_test, tests, questions)
+    if ingles is not None:
+        _collect(*ingles, "SYN-ING-*.md", build_english_test, tests, questions)
+    groups: dict[str, dict[str, str]] = {"temario": {}, "ingles": {}}
+    for test in tests:
+        if test["subject"] == "temario" and len(temas_of_scope(test["scope"])) == 1:
+            groups["temario"][test["scope"][1:]] = test["title"]
+    for q in questions:
+        if q["subject"] == "temario":
+            groups["temario"].setdefault(q["group"], f"Tema {q['group']}")
+        else:
+            groups["ingles"][q["group"]] = AREA_LABELS[q["group"]]
+    return {"schema": 2, "built": built, "groups": groups, "questions": questions, "tests": tests}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -181,23 +292,36 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--claves", type=Path, default=DEFAULT_CLAVES)
     parser.add_argument("--fichas", type=Path, default=DEFAULT_FICHAS)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--ingles-sinteticos", type=Path, default=DEFAULT_ING_SINTETICOS)
+    parser.add_argument("--ingles-claves", type=Path, default=DEFAULT_ING_CLAVES)
+    parser.add_argument("--ingles-fichas", type=Path, default=DEFAULT_ING_FICHAS)
     args = parser.parse_args(argv)
 
     built = dt.datetime.now().astimezone().isoformat(timespec="seconds")
     try:
-        bank = build_bank(args.sinteticos, args.claves, args.fichas, built)
+        bank = build_bank(
+            args.sinteticos,
+            args.claves,
+            args.fichas,
+            built,
+            ingles=(args.ingles_sinteticos, args.ingles_claves, args.ingles_fichas),
+        )
     except ParseError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(bank, ensure_ascii=False, indent=1), encoding="utf-8")
-    per_tema: dict[int, int] = {}
-    for question in bank["questions"]:
-        per_tema[question["tema"]] = per_tema.get(question["tema"], 0) + 1
-    print(f"Wrote {args.out}: {len(bank['tests'])} tests, {len(bank['questions'])} questions.")
-    for tema, count in sorted(per_tema.items()):
-        print(f"  Tema {tema}: {count} questions")
+    by_subject = {s: sum(t["subject"] == s for t in bank["tests"]) for s in ("temario", "ingles")}
+    print(
+        f"Wrote {args.out}: {len(bank['tests'])} tests "
+        f"(temario {by_subject['temario']}, ingles {by_subject['ingles']}), "
+        f"{len(bank['questions'])} questions."
+    )
+    for subject, labels in bank["groups"].items():
+        for group, label in labels.items():
+            count = sum(q["subject"] == subject and q["group"] == group for q in bank["questions"])
+            print(f"  [{subject}] {label}: {count} questions")
     return 0
 
 
