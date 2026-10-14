@@ -121,7 +121,7 @@ def test_random_mixed_practice_attempt():
 def test_unknown_cause_is_rejected():
     attempt = make_attempt()
     attempt["items"][1]["cause"] = "Inventada"
-    with pytest.raises(FichaError, match="unknown cause 'Inventada'"):
+    with pytest.raises(FichaError, match="unknown cause 'Inventada' for temario"):
         build_fields(attempt, {})
 
 
@@ -181,3 +181,24 @@ def test_utc_timestamps_from_the_app_become_local_date_and_times():
     fields = build_fields(attempt, {})
     assert fields["fecha"] == "2026-10-14"
     assert fields["observaciones"].endswith("Inicio 00:30, fin 00:47. Hecho en la app.")
+
+
+def test_english_fields_use_english_rules():
+    from profiles import INGLES
+
+    attempt = make_attempt(test_id="SYN-ING-004")
+    attempt["items"][1]["cause"] = "Aplique mal la regla"
+    attempt["items"][3]["cause"] = None
+    attempt["items"][4]["cause"] = None
+    fields = build_fields(attempt, {}, INGLES)
+    assert fields["modo"] == "Mixto"
+    assert "corte" not in fields
+    assert fields["causas"] == "2: Aplique mal la regla"
+
+
+def test_temario_cause_on_english_attempt_is_rejected():
+    from profiles import INGLES
+
+    attempt = make_attempt(test_id="SYN-ING-004")
+    with pytest.raises(FichaError, match="unknown cause 'Confundí dos conceptos' for ingles"):
+        build_fields(attempt, {}, INGLES)

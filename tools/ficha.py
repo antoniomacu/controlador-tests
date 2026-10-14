@@ -12,16 +12,9 @@ import datetime as dt
 import re
 
 from bank_parser import parse_front_matter, parse_key_file
+from profiles import TEMARIO, Profile
 
-CAUSES = (
-    "No conocía el dato",
-    "Confundí dos conceptos",
-    "Lo recordaba mal",
-    "Mala lectura del enunciado",
-    "Dudé entre dos opciones",
-    "Sin tiempo",
-    "Otro",
-)
+CAUSES = TEMARIO.causes
 PREPARED_WINS = ("subtipos", "corte")
 TEMAS_IN_ID = re.compile(r"-T(\d+)-")
 
@@ -70,7 +63,9 @@ def _tramos(items: list[dict]) -> str:
     return ", ".join(mmss(t) for t in marks)
 
 
-def build_fields(attempt: dict, subtipos_by_q: dict[str, str]) -> dict[str, str]:
+def build_fields(
+    attempt: dict, subtipos_by_q: dict[str, str], profile: Profile = TEMARIO
+) -> dict[str, str]:
     """Compute every ficha field for ``attempt`` (one element of ``results.json`` attempts)."""
     items = attempt["items"]
     causes: dict[int, str] = {}
@@ -78,8 +73,8 @@ def build_fields(attempt: dict, subtipos_by_q: dict[str, str]) -> dict[str, str]
         cause = entry.get("cause")
         if cause is None:
             continue
-        if cause not in CAUSES:
-            raise FichaError(f"question {number}: unknown cause {cause!r}")
+        if cause not in profile.causes:
+            raise FichaError(f"question {number}: unknown cause {cause!r} for {profile.subject}")
         causes[number] = cause
     subtipos = {
         n: subtipos_by_q[e["q"]] for n, e in enumerate(items, start=1) if e["q"] in subtipos_by_q
@@ -90,18 +85,19 @@ def build_fields(attempt: dict, subtipos_by_q: dict[str, str]) -> dict[str, str]
     started, finished = _local(attempt["started"]), _local(attempt["finished"])
     start = started.strftime("%H:%M") if started else ""
     end = finished.strftime("%H:%M") if finished else ""
-    return {
+    multi = len(temas_from_test_id(attempt["test_id"])) > 1
+    fields = {
         "id": ficha_id(attempt),
         "categoria": "SYN",
         "dificultad": "SINTETICO",
-        "modo": "Mixto" if len(temas_from_test_id(attempt["test_id"])) > 1 else "Bloque",
+        "modo": profile.fixed_modo or ("Mixto" if multi else "Bloque"),
         "intento": str(attempt["attempt"]),
         "fecha": started.date().isoformat() if started else "",
         "preguntas": str(len(items)),
         "limite": f"{attempt['limit_min']:g}",
         "tiempo": mmss(attempt["total_secs"]),
         "tramos": _tramos(items),
-        "corte": "50",
+        "corte": profile.corte or "",
         "respuestas": _group_tens([(e["ans"] or "-").upper() for e in items]),
         "clave": _group_tens([e["key"].upper() for e in items]),
         "dudas": ", ".join(str(n) for n, e in enumerate(items, start=1) if e["doubt"]),
@@ -111,6 +107,9 @@ def build_fields(attempt: dict, subtipos_by_q: dict[str, str]) -> dict[str, str]
         "sintetico": "si",
         "observaciones": f"{mode}. Inicio {start}, fin {end}. Hecho en la app.",
     }
+    if profile.corte is None:
+        del fields["corte"]
+    return fields
 
 
 def _line(key: str, value: str) -> str:
