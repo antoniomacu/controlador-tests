@@ -5,14 +5,17 @@ import { validateBank } from '../../src/domain/bank';
 
 const REAL = join(homedir(), 'Documents/controlador/Primer Examen/app-sync/bank.json');
 
+// Read lazily: a skipped describe still runs its body, and CI has no real bank.
+const load = () => validateBank(JSON.parse(readFileSync(REAL, 'utf-8')));
+
 describe.skipIf(!existsSync(REAL))('real bank.json from build_bank.py', () => {
-  const result = validateBank(JSON.parse(readFileSync(REAL, 'utf-8')));
 
   it('passes the app validation', () => {
-    expect(result).toMatchObject({ ok: true });
+    expect(load()).toMatchObject({ ok: true });
   });
 
   it('carries both subjects, every English question in a labelled area', () => {
+    const result = load();
     if (!result.ok) throw new Error(result.error);
     const { bank } = result;
     expect(bank.schema).toBe(2);
