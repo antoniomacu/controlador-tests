@@ -58,8 +58,10 @@ in `~/Documents/controlador/Primer Examen/app-sync/`, outside this repository.
 
 ### Sending new questions to the phone
 
-After new synthetic tests (`SYN-*.md`) have been added to `Temario/Tests/SINTETICOS/` with their
-archived key in the vault, rebuild the bank:
+After new synthetic tests have been added — Temario tests (`SYN-T*.md`) to
+`Temario/Tests/SINTETICOS/`, English tests (`SYN-ING-*.md`) to `Ingles/tests/SINTETICOS/`, each with
+its archived key in the matching vault (`teoria/` or `ingles/`) — rebuild the bank. One build
+reads both subjects and writes a single `bank.json`:
 
 ```bash
 cd tools && uv run python build_bank.py
@@ -67,7 +69,9 @@ cd tools && uv run python build_bank.py
 
 The build checks every test before writing anything: the answer key in the test must match the
 archived key in `20-REGISTRO/claves/`, every reasoned solution must agree with the key, and the
-number of questions, key letters and solutions must agree. The first inconsistency stops the build
+number of questions, key letters and solutions must agree. English questions must also resolve to
+one of the nine grammar and vocabulary **areas** (the prefix of their subtipo, such as `lexico-` or
+`morfo-`), because random English practice is drawn by area. The first inconsistency stops the build
 with a message naming the file and the question, so a bank with a wrong key can never reach the
 phone.
 
@@ -90,6 +94,13 @@ yet with their scores, and asks for confirmation. For each attempt it writes a f
 `registrar.py` on it, which writes the Excel rows. An attempt is recorded in the ledger only after
 `registrar.py` succeeds. If registration fails, for example because the Excel is open, the ficha is
 put back as it was, the run stops with the reason, and the next run retries from that attempt.
+
+Each attempt is routed by its subject. Temario attempts go to the Temario fichas and
+`registrar.py`, which writes `Teoria_Maestro_v1.xlsx`; English attempts go to the English fichas
+and the English `registrar.py`, which writes `Ingles_Maestro_v1.xlsx`, using the English list of
+failure causes. Before writing anything, the tool checks that Excel does not hold either workbook
+open — a workbook saved by Excel after the tool wrote to it would silently lose the new rows — and
+stops with a message if it does.
 
 A second attempt at the same test is registered as `<test>-i2`, a third as `<test>-i3`, and so on.
 This is required because `registrar.py` records every synthetic test with attempt number 9 and
