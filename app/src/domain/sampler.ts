@@ -18,11 +18,17 @@ function pick(
   temas: readonly number[],
 ): Question[] {
   const wanted = new Set(temas);
-  return questions.filter((x) => x.subject === subject && wanted.has(x.tema));
+  return questions.filter((x) => x.subject === subject && x.tema !== null && wanted.has(x.tema));
 }
 
 export function temasOf(questions: readonly Question[], subject: Subject): number[] {
-  return [...new Set(questions.filter((x) => x.subject === subject).map((x) => x.tema))].sort(
+  return [
+    ...new Set(
+      questions
+        .filter((x) => x.subject === subject)
+        .flatMap((x) => (x.tema === null ? [] : [x.tema])),
+    ),
+  ].sort(
     (a, b) => a - b,
   );
 }

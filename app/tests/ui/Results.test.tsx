@@ -14,6 +14,7 @@ const q = (n: number, answer: 'a' | 'b'): Question => ({
   id: `X#${n}`,
   subject: 'temario',
   tema: 1,
+  group: '1',
   stem: `Enunciado ${n}`,
   answer,
   level: 'N2',

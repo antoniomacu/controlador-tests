@@ -28,6 +28,7 @@ function q(n: number, answer: 'a' | 'b' | 'c' | 'd'): Question {
     id: `SYN-T4-001#${n}`,
     subject: 'temario',
     tema: 4,
+    group: '4',
     stem: `Q${n}`,
     answer,
     level: 'N1',

@@ -7,7 +7,8 @@ export const SUBJECTS: readonly Subject[] = ['temario', 'ingles'];
 export type Level = 'N1' | 'N2' | 'N3';
 export type Mode = 'exam' | 'practice';
 
-export const CAUSES = [
+/** Closed failure-cause lists, verbatim from each subject's GUIA-REGISTRO.md. */
+export const TEMARIO_CAUSES = [
   'No conocía el dato',
   'Confundí dos conceptos',
   'Lo recordaba mal',
@@ -16,16 +17,38 @@ export const CAUSES = [
   'Sin tiempo',
   'Otro',
 ] as const;
-export type Cause = (typeof CAUSES)[number];
+export const INGLES_CAUSES = [
+  'No conocia la palabra',
+  'Elegi por como sonaba',
+  'Confundi dos palabras proximas',
+  'No conocia la regla',
+  'Aplique mal la regla',
+  'Mala lectura del enunciado',
+  'Dude entre dos opciones',
+  'Sin tiempo',
+  'Otro',
+] as const;
+export type Cause = (typeof TEMARIO_CAUSES)[number] | (typeof INGLES_CAUSES)[number];
+export const CAUSES_BY_SUBJECT: Record<Subject, readonly Cause[]> = {
+  temario: TEMARIO_CAUSES,
+  ingles: INGLES_CAUSES,
+};
+/** @deprecated use CAUSES_BY_SUBJECT; kept until the review screen is per-subject. */
+export const CAUSES = TEMARIO_CAUSES;
 
 export interface Question {
   id: string;
   subject: Subject;
-  tema: number;
+  /** Chapter for Temario; null for English. */
+  tema: number | null;
+  /** What random practice draws from: the chapter ("4") or the English area ("morfo"). */
+  group: string;
   stem: string;
   options: Record<Letter, string>;
   answer: Letter;
-  level: Level;
+  level?: Level | null;
+  /** Shown in review: the page citation (Temario) or the exam anchor (English). */
+  ref?: string | null;
   subtipo?: string | null;
   cite?: string | null;
   explanation?: string | null;
@@ -44,8 +67,10 @@ export interface TestDef {
 }
 
 export interface Bank {
-  schema: 1;
+  schema: 2;
   built: string;
+  /** Display labels of every group that has questions, per subject. */
+  groups: Record<Subject, Record<string, string>>;
   questions: Question[];
   tests: TestDef[];
 }

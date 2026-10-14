@@ -9,23 +9,50 @@ const fail = (error: string): BankResult => ({ ok: false, error });
 
 function questionError(q: Obj): string | null {
   if (!SUBJECTS.includes(q.subject as never)) return 'asignatura inválida';
-  if (!Number.isInteger(q.tema) || (q.tema as number) < 1) return 'tema inválido';
+  if (!isText(q.group)) return 'grupo vacío';
   if (!isText(q.stem)) return 'enunciado vacío';
   const options = q.options;
   if (!isObj(options) || !LETTERS.every((l) => isText(options[l]))) {
     return 'opciones incompletas';
   }
   if (!LETTERS.includes(q.answer as never)) return 'respuesta inválida';
-  if (!['N1', 'N2', 'N3'].includes(q.level as string)) return 'nivel inválido';
+  if (q.level != null && !['N1', 'N2', 'N3'].includes(q.level as string)) return 'nivel inválido';
   return null;
 }
 
+/**
+ * Schema 1 → 2 in memory: group = chapter, ref = cite, chapter labels from the titles of
+ * single-chapter tests. A schema-2 bank is returned unchanged.
+ */
+export function upgradeBank(raw: Obj): Obj {
+  if (raw.schema !== 1 || !Array.isArray(raw.questions) || !Array.isArray(raw.tests)) return raw;
+  const questions = (raw.questions as Obj[]).map((q) => ({
+    ...q,
+    group: String(q.tema),
+    ref: q.cite ?? null,
+  }));
+  const temario: Record<string, string> = {};
+  for (const t of raw.tests as Obj[]) {
+    const m = /^T(\d)$/.exec(String(isObj(t) ? t.scope : ''));
+    if (m && isObj(t)) temario[m[1]] = String(t.title);
+  }
+  for (const q of questions) temario[q.group] ??= `Tema ${q.group}`;
+  return { ...raw, schema: 2, groups: { temario, ingles: {} }, questions };
+}
+
 /** Checks structure and references so a broken file never replaces a working bank. */
-export function validateBank(raw: unknown): BankResult {
-  if (!isObj(raw)) return fail('El archivo no es un banco.');
-  if ('attempts' in raw) return fail('Este archivo es un results.json, no un banco.');
-  if (raw.schema !== 1) return fail(`Versión de banco no soportada: ${String(raw.schema)}.`);
+export function validateBank(input: unknown): BankResult {
+  if (!isObj(input)) return fail('El archivo no es un banco.');
+  if ('attempts' in input) return fail('Este archivo es un results.json, no un banco.');
+  if (input.schema !== 1 && input.schema !== 2) {
+    return fail(`Versión de banco no soportada: ${String(input.schema)}.`);
+  }
+  const raw = upgradeBank(input);
   if (!Array.isArray(raw.questions) || !Array.isArray(raw.tests)) {
+    return fail('El archivo no es un banco.');
+  }
+  const groups = raw.groups;
+  if (!isObj(groups) || !SUBJECTS.every((s) => isObj(groups[s]))) {
     return fail('El archivo no es un banco.');
   }
 
@@ -36,6 +63,9 @@ export function validateBank(raw: unknown): BankResult {
     ids.add(q.id);
     const problem = questionError(q);
     if (problem) return fail(`Pregunta ${q.id}: ${problem}.`);
+    if (!((q.group as string) in (groups[q.subject as string] as Obj))) {
+      return fail(`Pregunta ${q.id}: grupo desconocido.`);
+    }
   }
 
   for (const t of raw.tests) {

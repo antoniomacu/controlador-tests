@@ -11,6 +11,7 @@ function q(id: string, tema: number, subject: 'temario' | 'ingles' = 'temario'):
     id,
     subject,
     tema,
+    group: String(tema),
     stem: id,
     answer: 'a',
     level: 'N1',

@@ -8,6 +8,7 @@ const q = (n: number): Question => ({
   id: `X#${n}`,
   subject: 'temario',
   tema: 1,
+  group: '1',
   stem: `Enunciado ${n}`,
   answer: 'a',
   level: 'N1',

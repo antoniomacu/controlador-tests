@@ -6,14 +6,16 @@ const q = (id: string, tema: number): Question => ({
   id,
   subject: 'temario',
   tema,
+  group: String(tema),
   stem: id,
   answer: 'a',
   level: 'N1',
   options: { a: '1', b: '2', c: '3', d: '4' },
 });
 const bank: Bank = {
-  schema: 1,
+  schema: 2,
   built: 'x',
+  groups: { temario: { '3': 'Tema 3', '4': 'Tema 4' }, ingles: {} },
   questions: [q('A#1', 3), q('A#2', 3), q('B#1', 4)],
   tests: [
     {
