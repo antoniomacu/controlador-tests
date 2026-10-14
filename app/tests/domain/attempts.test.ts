@@ -151,6 +151,7 @@ describe('attempts', () => {
     const file = toResultsFile([open, done], '2026-10-14T21:00:00Z');
     expect(file.schema).toBe(1);
     expect(file.attempts.map((x) => x.uuid)).toEqual(['done']);
+    expect(file.attempts[0].subject).toBe('temario');
     expect(Object.keys(file.attempts[0]).sort()).toEqual(
       [
         'attempt',
@@ -161,6 +162,7 @@ describe('attempts', () => {
         'mode',
         'started',
         'status',
+        'subject',
         'test_id',
         'total_secs',
         'uuid',

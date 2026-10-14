@@ -33,8 +33,7 @@ export const CAUSES_BY_SUBJECT: Record<Subject, readonly Cause[]> = {
   temario: TEMARIO_CAUSES,
   ingles: INGLES_CAUSES,
 };
-/** @deprecated use CAUSES_BY_SUBJECT; kept until the review screen is per-subject. */
-export const CAUSES = TEMARIO_CAUSES;
+
 
 export interface Question {
   id: string;
@@ -130,6 +129,7 @@ export type ExportAttempt = Pick<
   | 'limit_min'
   | 'total_secs'
   | 'status'
+  | 'subject'
 > & { items: ExportItem[] };
 
 export interface ResultsFile {
