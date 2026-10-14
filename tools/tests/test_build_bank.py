@@ -156,3 +156,20 @@ def test_bank_is_schema_2_with_temario_group_labels(tmp_path):
     bank = build_bank(syn, FIX / "claves", FIX / "fichas", "x")
     assert bank["schema"] == 2
     assert bank["groups"]["temario"] == {"9": "Tema 9: Prueba"}
+
+
+def test_full_syllabus_tests_are_built(tmp_path):
+    syn, claves, fichas = tmp_path / "syn", tmp_path / "claves", tmp_path / "fichas"
+    for d in (syn, claves, fichas):
+        d.mkdir()
+    (syn / "SYN-FULL-901.md").write_text(
+        MODERN.replace("alcance: T9", "alcance: FULL"), encoding="utf-8"
+    )
+    (syn / "SYN-ING-777.md").write_text("not temario", encoding="utf-8")
+    (claves / "SYN-FULL-901.txt").write_text("CA", encoding="utf-8")
+    (fichas / "SYN-FULL-901.md").write_text(
+        "---\nsubtipos:      1: t1-a; 2: t9-b\n---\n", encoding="utf-8"
+    )
+    bank = build_bank(syn, claves, fichas, "x")
+    assert [t["id"] for t in bank["tests"]] == ["SYN-FULL-901"]
+    assert [q["group"] for q in bank["questions"]] == ["1", "9"]

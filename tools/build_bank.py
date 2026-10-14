@@ -245,8 +245,19 @@ def build_english_test(
     return test, entries
 
 
-def _collect(sinteticos, claves, fichas, pattern, builder, tests, questions) -> None:
+def _collect(
+    sinteticos: Path,
+    claves: Path,
+    fichas: Path,
+    pattern: str,
+    builder,
+    tests: list[dict],
+    questions: list[dict],
+    exclude: str | None = None,
+) -> None:
     for path in sorted(sinteticos.glob(pattern)):
+        if exclude and path.name.startswith(exclude):
+            continue
         test_id = path.stem
         key_path = claves / f"{test_id}.txt"
         if not key_path.exists():
@@ -271,7 +282,8 @@ def build_bank(
     """Build the bank (schema 2) from Temario ``SYN-T*`` and, optionally, English ``SYN-ING-*``."""
     tests: list[dict] = []
     questions: list[dict] = []
-    _collect(sinteticos, claves, fichas, "SYN-T*.md", build_test, tests, questions)
+    # Every SYN-* file except English ones is Temario (T1..T9, T12, FULL…).
+    _collect(sinteticos, claves, fichas, "SYN-*.md", build_test, tests, questions, "SYN-ING-")
     if ingles is not None:
         _collect(*ingles, "SYN-ING-*.md", build_english_test, tests, questions)
     groups: dict[str, dict[str, str]] = {"temario": {}, "ingles": {}}
