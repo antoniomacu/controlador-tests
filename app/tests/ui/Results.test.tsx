@@ -100,4 +100,38 @@ describe('Results', () => {
     expect(options).toContain('Aplique mal la regla');
     expect(options).not.toContain('Confundí dos conceptos');
   });
+
+  const DELETE_CONFIRM = '¿Borrar este intento? No se exportará ni contará para nada.';
+  const renderDel = (attempt: Attempt, confirm: boolean) => {
+    const props = {
+      attempt,
+      onChange: vi.fn(),
+      onHome: vi.fn(),
+      onDelete: vi.fn(),
+      confirmFn: vi.fn(() => confirm),
+    };
+    render(<Results {...props} />);
+    return props;
+  };
+
+  it('deletes an unexported attempt after confirmation', () => {
+    const props = renderDel(finished(), true);
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar intento' }));
+    expect(props.confirmFn).toHaveBeenCalledWith(DELETE_CONFIRM);
+    expect(props.onDelete).toHaveBeenCalledWith('u');
+  });
+
+  it('keeps the attempt when the confirmation is declined', () => {
+    const props = renderDel(finished(), false);
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar intento' }));
+    expect(props.onDelete).not.toHaveBeenCalled();
+  });
+
+  it('cannot delete an exported attempt and says why', () => {
+    renderDel({ ...finished(), exported: true }, true);
+    expect(screen.queryByRole('button', { name: 'Borrar intento' })).toBeNull();
+    expect(
+      screen.getByText('Exportado: puede estar ya en el Excel, así que no se puede borrar aquí.'),
+    ).toBeTruthy();
+  });
 });

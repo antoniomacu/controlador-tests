@@ -7,10 +7,12 @@ import {
   nextAttemptNumber,
 } from './domain/attempts';
 import { summarizeBankChange, validateBank } from './domain/bank';
+import { ALL, scopesFor, type ScopeFilter } from './domain/history';
 import type { Attempt, Bank, Subject } from './domain/types';
 import {
   deleteAttempt,
   getBank,
+  getMeta,
   listAttempts,
   putAttempt,
   putAttempts,
@@ -60,6 +62,8 @@ export function App({
   const [subject, setSubject] = useState<Subject>('temario');
   const [message, setMessage] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Chapter chip per subject. Held here, not in Home, so it survives a test or a result screen.
+  const [scopeBy, setScopeBy] = useState<Partial<Record<Subject, ScopeFilter>>>({});
 
   // Startup: resume an open attempt, or finish it if an exam expired while the app was closed.
   useEffect(() => {
@@ -82,6 +86,8 @@ export function App({
             : { name: 'results', uuid: checked.uuid },
         );
       }
+      // Read before the first render so a remembered chapter never flashes "Todos".
+      setScopeBy((await getMeta<Partial<Record<Subject, ScopeFilter>>>(db, 'scopeFilter')) ?? {});
       setBank(storedBank);
       setAttempts(stored);
       setLoaded(true);
@@ -109,7 +115,8 @@ export function App({
     [save],
   );
 
-  const onAbandon = useCallback(
+  /** Hard-deletes an attempt that never left the phone: abandoned, or deleted from its results. */
+  const removeAttempt = useCallback(
     (uuid: string) => {
       setAttempts((prev) => prev.filter((a) => a.uuid !== uuid));
       void deleteAttempt(db, uuid);
@@ -158,7 +165,17 @@ export function App({
     );
   }
 
+  function onScope(scope: ScopeFilter) {
+    const next = { ...scopeBy, [subject]: scope };
+    setScopeBy(next);
+    void setMeta(db, 'scopeFilter', next);
+  }
+
   if (!loaded) return <main class="loading">Cargando…</main>;
+
+  // A remembered chapter that a new bank no longer has falls back to "Todos".
+  const remembered = scopeBy[subject];
+  const scope = remembered && scopesFor(bank, subject).includes(remembered) ? remembered : ALL;
 
   const current = 'uuid' in screen ? attempts.find((a) => a.uuid === screen.uuid) : undefined;
   let body: JSX.Element;
@@ -170,11 +187,19 @@ export function App({
         confirmFn={confirmFn}
         onChange={save}
         onFinished={onFinished}
-        onAbandon={onAbandon}
+        onAbandon={removeAttempt}
       />
     );
   } else if (screen.name === 'results' && current) {
-    body = <Results attempt={current} onChange={save} onHome={() => setScreen({ name: 'home' })} />;
+    body = (
+      <Results
+        attempt={current}
+        onChange={save}
+        onHome={() => setScreen({ name: 'home' })}
+        onDelete={removeAttempt}
+        confirmFn={confirmFn}
+      />
+    );
   } else if (screen.name === 'setup' && bank) {
     const test = screen.testId ? (bank.tests.find((t) => t.id === screen.testId) ?? null) : null;
     body = (
@@ -202,6 +227,8 @@ export function App({
         onImport={(file) => void onImport(file)}
         onExport={() => void onExport()}
         onOpenAttempt={(uuid) => setScreen({ name: 'results', uuid })}
+        scope={scope}
+        onScope={onScope}
       />
     );
   }

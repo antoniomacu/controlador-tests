@@ -72,6 +72,12 @@ describe('attempts', () => {
     expect(nextAttemptNumber([], 'SYN-T4-001')).toBe(1);
   });
 
+  it('numbers after the highest attempt, so a deleted one never causes a duplicate', () => {
+    const first = { ...createAttempt(base()), attempt: 1 };
+    const third = { ...createAttempt(base({ uuid: 'u3' })), attempt: 3 };
+    expect(nextAttemptNumber([first, third], 'SYN-T4-001')).toBe(4);
+  });
+
   it('selects, changes and clears an answer, keeping the first answer time', () => {
     let a = createAttempt(base());
     a = selectAnswer(a, 'b', 10);

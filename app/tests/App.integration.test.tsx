@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { App } from '../src/App';
 import type { Bank } from '../src/domain/types';
-import { listAttempts, openAppDb, putBank, type Db } from '../src/storage/db';
+import { getMeta, listAttempts, openAppDb, putBank, setMeta, type Db } from '../src/storage/db';
 
 const bank: Bank = {
   schema: 2,
@@ -25,6 +25,16 @@ const bank: Bank = {
       scope: 'T4',
       title: 'Tema 4',
       questions: ['SYN-T4-001#1', 'SYN-T4-001#2'],
+      limit_min: 2,
+      pass_ref: 1,
+      synthetic: true,
+    },
+    {
+      id: 'SYN-T3-001',
+      subject: 'temario',
+      scope: 'T3',
+      title: 'Tema 3',
+      questions: ['SYN-T4-001#1'],
       limit_min: 2,
       pass_ref: 1,
       synthetic: true,
@@ -119,7 +129,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abandonar' }));
     expect(await screen.findByRole('button', { name: /Tema 4/ })).toBeTruthy();
     await waitFor(async () => expect(await listAttempts(db)).toHaveLength(0));
-    expect(screen.getByText('Sin hacer')).toBeTruthy();
+    expect(screen.getAllByText('Sin hacer')).toHaveLength(2);
   });
 
   it('keeps working with a schema-1 bank stored before the update', async () => {
@@ -145,5 +155,55 @@ describe('App', () => {
     fireEvent.change(input, { target: { files: [bad] } });
     expect(await screen.findByText('Este archivo es un results.json, no un banco.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Tema 4/ })).toBeTruthy();
+  });
+
+  const pressed = (name: string) =>
+    screen.getByRole('button', { name }).getAttribute('aria-pressed') === 'true';
+
+  it('keeps the chosen chapter after a test and after opening an attempt', async () => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'T4' }));
+    await startTest();
+    await finishAndGoHome();
+    expect(pressed('T4')).toBe(true);
+    fireEvent.click(document.querySelector('.history-row') as Element);
+    fireEvent.click(await screen.findByRole('button', { name: 'Volver al inicio' }));
+    expect(pressed('T4')).toBe(true);
+  });
+
+  it('keeps one chapter per subject when switching tabs', async () => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'T4' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Inglés' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Temario' }));
+    expect(pressed('T4')).toBe(true);
+  });
+
+  it('remembers the chapter across a restart', async () => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'T4' }));
+    await waitFor(async () => expect(await getMeta(db, 'scopeFilter')).toEqual({ temario: 'T4' }));
+    cleanup();
+    mount();
+    await screen.findByRole('button', { name: 'T4' });
+    expect(pressed('T4')).toBe(true);
+  });
+
+  it('falls back to Todos when the remembered chapter is no longer in the bank', async () => {
+    await setMeta(db, 'scopeFilter', { temario: 'T7' });
+    mount();
+    await screen.findByRole('button', { name: 'Todos' });
+    expect(pressed('Todos')).toBe(true);
+    expect(screen.getByRole('heading', { name: 'T4' })).toBeTruthy();
+  });
+
+  it('deletes a finished, unexported attempt from its result screen', async () => {
+    mount();
+    await startTest();
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminar' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Borrar intento' }));
+    expect(await screen.findByRole('button', { name: 'Exportar resultados (0)' })).toBeTruthy();
+    expect(document.querySelector('.history-row')).toBeNull();
+    await waitFor(async () => expect(await listAttempts(db)).toHaveLength(0));
   });
 });

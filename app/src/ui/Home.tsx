@@ -1,4 +1,5 @@
 import { needsExportReminder, pendingExportCount } from '../domain/attempts';
+import { ALL, historyFor, isLowScore, scopesFor, type ScopeFilter } from '../domain/history';
 import { score } from '../domain/scoring';
 import type { Attempt, Bank, Subject, TestDef } from '../domain/types';
 
@@ -14,6 +15,9 @@ interface HomeProps {
   onImport: (file: File) => void;
   onExport: () => void;
   onOpenAttempt: (uuid: string) => void;
+  /** Chapter filter: `ALL` or one scope; held by App so it survives navigation. */
+  scope: ScopeFilter;
+  onScope: (scope: ScopeFilter) => void;
 }
 
 function status(test: TestDef, attempts: Attempt[]): string {
@@ -26,7 +30,9 @@ function status(test: TestDef, attempts: Attempt[]): string {
 
 export function Home(p: HomeProps) {
   const tests = (p.bank?.tests ?? []).filter((t) => t.subject === p.subject);
-  const scopes = [...new Set(tests.map((t) => t.scope))];
+  const scopes = scopesFor(p.bank, p.subject);
+  const shown = p.scope === ALL ? scopes : scopes.filter((s) => s === p.scope);
+  const history = historyFor(p.attempts, p.bank, p.subject, p.scope);
   const finished = p.attempts.filter((a) => a.status === 'finished');
   const pending = pendingExportCount(p.attempts);
   const hasQuestions = (p.bank?.questions ?? []).some((q) => q.subject === p.subject);
@@ -59,7 +65,33 @@ export function Home(p: HomeProps) {
       )}
       {!p.bank && <p class="empty">No hay banco. Importa bank.json para empezar.</p>}
 
-      {scopes.map((scope) => (
+      {scopes.length > 1 && (
+        <nav class="scopes" aria-label="Temas">
+          {[ALL, ...scopes].map((s) => (
+            <button
+              type="button"
+              key={s}
+              aria-pressed={p.scope === s}
+              ref={(el) => {
+                if (el && p.scope === s) el.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
+              }}
+              onClick={(e) => {
+                p.onScope(s);
+                // Tapped mid-scroll: bring the page back to the chip row, the top of the chapter.
+                // Measured from the element above the row: a stuck sticky row reports where it is
+                // pinned, not where it sits in the page.
+                const above = (e.currentTarget as HTMLElement).parentElement?.previousElementSibling;
+                const top = above instanceof HTMLElement ? above.offsetTop + above.offsetHeight : 0;
+                if (window.scrollY > top) window.scrollTo({ top, behavior: 'auto' });
+              }}
+            >
+              {s === ALL ? 'Todos' : s}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {shown.map((scope) => (
         <section key={scope} class="scope">
           <h2>{scope}</h2>
           {tests
@@ -83,22 +115,21 @@ export function Home(p: HomeProps) {
         Práctica aleatoria
       </button>
 
-      {finished.length > 0 && (
+      {history.length > 0 && (
         <section class="history">
-          <h2>Historial</h2>
-          {finished
-            .slice(-10)
-            .reverse()
-            .map((a) => (
-              <button
-                type="button"
-                key={a.uuid}
-                class="history-row"
-                onClick={() => p.onOpenAttempt(a.uuid)}
-              >
-                {`${a.title} · ${(a.finished ?? '').slice(0, 10)} · neta ${score(a.items).net}`}
-              </button>
-            ))}
+          <h2>{p.scope === ALL ? 'Historial' : `Historial · ${p.scope}`}</h2>
+          {history.map((a) => (
+            <button
+              type="button"
+              key={a.uuid}
+              class="history-row"
+              onClick={() => p.onOpenAttempt(a.uuid)}
+            >
+              <span class="what">{`${a.title} · ${(a.finished ?? '').slice(0, 10)}`}</span>
+              <span class="net">{`neta ${score(a.items).net}`}</span>
+              {isLowScore(a) && <span class="low">bajo</span>}
+            </button>
+          ))}
         </section>
       )}
 

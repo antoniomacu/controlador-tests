@@ -20,3 +20,6 @@ claves/
 *.jpeg
 *.webp
 !app/public/*.png
+
+# Brainstorm companion mockups
+.superpowers/

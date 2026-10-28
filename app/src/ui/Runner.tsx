@@ -83,6 +83,18 @@ export function Runner({
             {paused ? 'Reanudar' : 'Pausa'}
           </button>
         )}
+        {/* In the top bar so it is found without scrolling; still behind a confirmation. */}
+        <button
+          type="button"
+          class="abandon"
+          onClick={() => {
+            if (confirmFn('¿Abandonar este intento? Se borrará y no contará para nada.')) {
+              onAbandon(a.uuid);
+            }
+          }}
+        >
+          Abandonar
+        </button>
       </header>
 
       {paused ? (
@@ -159,17 +171,6 @@ export function Runner({
 
       <button type="button" class="finish" onClick={finish}>
         Terminar
-      </button>
-      <button
-        type="button"
-        class="abandon"
-        onClick={() => {
-          if (confirmFn('¿Abandonar este intento? Se borrará y no contará para nada.')) {
-            onAbandon(a.uuid);
-          }
-        }}
-      >
-        Abandonar
       </button>
     </main>
   );
