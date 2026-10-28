@@ -75,6 +75,7 @@ function baseProps(attempts: Attempt[]) {
     onScope: vi.fn(),
     section: 'temas' as const,
     onSection: vi.fn(),
+    onResume: vi.fn(),
   };
 }
 
@@ -218,6 +219,18 @@ describe('Home', () => {
       expect(screen.getByText('Importar banco')).toBeTruthy();
       unmount();
     }
+  });
+
+  it('offers to continue an unfinished test from every section', () => {
+    const open = { ...done('2026-10-13T10:00:00Z'), status: 'in_progress' } as Attempt;
+    const props = renderHome([open], { section: 'practica' });
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar: Tema 4: Cartografía' }));
+    expect(props.onResume).toHaveBeenCalled();
+  });
+
+  it('shows no continue button when nothing is in progress', () => {
+    renderHome([done('2026-10-13T10:00:00Z')]);
+    expect(screen.queryByRole('button', { name: /Continuar/ })).toBeNull();
   });
 
   it('takes the page back to the top when the section changes mid-scroll', () => {
