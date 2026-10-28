@@ -199,6 +199,35 @@ button[aria-selected='true'] {
   border-color: var(--primary);
   font-weight: 700;
 }
+/* The test left with the edge swipe: first thing on home until it is finished or replaced. */
+.resume {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-2);
+  text-align: left;
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+/* Edge-swipe cue: a round arrow that slides in with the finger; solid once release goes back. */
+.swipe-cue {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  z-index: 20;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.swipe-cue.ready { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
 .random { display: block; width: 100%; margin-top: var(--space-3); border-color: var(--primary); color: var(--primary); }
 .sync { margin-top: var(--space-4); padding-top: var(--space-2); border-top: 1px solid var(--border); }
 .sync > * { flex: 1 1 0; }

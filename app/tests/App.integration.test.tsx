@@ -70,6 +70,20 @@ async function finishAndGoHome() {
   fireEvent.click(await screen.findByRole('button', { name: 'Volver al inicio' }));
 }
 
+/** The iPhone back gesture: a drag from the left edge across most of the screen. */
+function swipeBack(fromX = 5) {
+  fireEvent.touchStart(document, { touches: [{ clientX: fromX, clientY: 300 }] });
+  fireEvent.touchMove(document, { touches: [{ clientX: fromX + 500, clientY: 310 }] });
+  fireEvent.touchEnd(document, { changedTouches: [{ clientX: fromX + 500, clientY: 310 }] });
+}
+
+async function startPractice(title = /Tema 4/) {
+  fireEvent.click(await screen.findByRole('button', { name: title }));
+  fireEvent.click(screen.getByLabelText(/Práctica \(límite blando/));
+  fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+  await screen.findByText(/Enunciado/);
+}
+
 describe('App', () => {
   it('persists every action and resumes on the same question after a restart', async () => {
     mount();
@@ -211,5 +225,90 @@ describe('App', () => {
     expect(screen.getByText('Sin intentos.')).toBeTruthy();
     expect(document.querySelector('.history-row')).toBeNull();
     await waitFor(async () => expect(await listAttempts(db)).toHaveLength(0));
+  });
+
+  describe('edge swipe back', () => {
+    it('returns from an attempt review to the Historial it was opened from', async () => {
+      mount();
+      await startTest();
+      await finishAndGoHome();
+      fireEvent.click(screen.getByRole('tab', { name: 'Historial' }));
+      fireEvent.click(document.querySelector('.history-row') as Element);
+      await screen.findByRole('button', { name: 'Volver al inicio' });
+      swipeBack();
+      expect(screen.getByRole('tab', { name: 'Historial' }).getAttribute('aria-selected')).toBe(
+        'true',
+      );
+      expect(screen.queryByRole('button', { name: 'Volver al inicio' })).toBeNull();
+    });
+
+    it('returns from the setup screen to home', async () => {
+      mount();
+      fireEvent.click(await screen.findByRole('button', { name: /Tema 4/ }));
+      swipeBack();
+      expect(screen.queryByRole('button', { name: 'Empezar' })).toBeNull();
+      expect(screen.getByRole('tab', { name: 'Temas' })).toBeTruthy();
+    });
+
+    it('ignores a drag that does not start at the left edge', async () => {
+      mount();
+      fireEvent.click(await screen.findByRole('button', { name: /Tema 4/ }));
+      swipeBack(100);
+      expect(screen.getByRole('button', { name: 'Empezar' })).toBeTruthy();
+    });
+
+    it('leaves a practice test without asking, paused, and resumes it from home', async () => {
+      const ask = vi.fn(() => true);
+      mount({ confirmFn: ask });
+      await startPractice();
+      swipeBack();
+      expect(ask).not.toHaveBeenCalled();
+      await waitFor(async () => {
+        const [saved] = await listAttempts(db);
+        expect(saved.status).toBe('in_progress');
+        expect(saved.timer.pausedAtMs).not.toBeNull();
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Continuar/ }));
+      expect(await screen.findByText('Enunciado 1')).toBeTruthy();
+      await waitFor(async () => expect((await listAttempts(db))[0].timer.pausedAtMs).toBeNull());
+    });
+
+    it('warns before leaving a real exam and stays when the warning is declined', async () => {
+      const ask = vi.fn(() => false);
+      mount({ confirmFn: ask });
+      await startTest();
+      swipeBack();
+      expect(ask).toHaveBeenCalledWith(
+        '¿Salir del examen? El reloj sigue corriendo y se terminará solo al acabar el tiempo.',
+      );
+      expect(screen.getByText('Enunciado 1')).toBeTruthy();
+    });
+
+    it('keeps an exam left from the runner, which finishes itself once its time is up', async () => {
+      mount();
+      await startTest();
+      swipeBack();
+      expect(screen.getByRole('button', { name: /Continuar/ })).toBeTruthy();
+      expect((await listAttempts(db))[0].status).toBe('in_progress');
+      clock += 10 * 60 * 1000;
+      fireEvent.click(screen.getByRole('button', { name: /Continuar/ }));
+      expect(await screen.findByText('Tiempo 02:00 de 02:00 · Modo examen')).toBeTruthy();
+    });
+
+    it('asks before replacing an unfinished test with a new one', async () => {
+      const ask = vi.fn(() => true);
+      mount({ confirmFn: ask });
+      await startPractice();
+      swipeBack();
+      await startPractice(/Tema 3/);
+      expect(ask).toHaveBeenCalledWith(
+        'Tienes un test sin terminar (Tema 4). ¿Abandonarlo y empezar este?',
+      );
+      await waitFor(async () => {
+        const saved = await listAttempts(db);
+        expect(saved).toHaveLength(1);
+        expect(saved[0].test_id).toBe('SYN-T3-001');
+      });
+    });
   });
 });

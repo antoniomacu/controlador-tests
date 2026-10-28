@@ -30,6 +30,13 @@ describe('styles', () => {
     expect(block(".sections [role='tab'][aria-selected='true']")).toContain('border-bottom-color');
   });
 
+  it('floats the swipe cue over the page without catching touches', () => {
+    const cue = block('.swipe-cue');
+    expect(cue).toContain('position: fixed');
+    expect(cue).toContain('pointer-events: none');
+    expect(cue).toContain('top: 50%');
+  });
+
   it('keeps the runner bar tight enough for clock, progress, Reanudar and Abandonar', () => {
     expect(block('.runner-bar')).toContain('gap: var(--space-1)');
   });

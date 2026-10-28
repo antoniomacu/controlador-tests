@@ -34,6 +34,8 @@ interface HomeProps {
   onScope: (scope: ScopeFilter) => void;
   section: HomeSection;
   onSection: (section: HomeSection) => void;
+  /** Back into the test left half-way through with the edge swipe. */
+  onResume: () => void;
 }
 
 function status(test: TestDef, attempts: Attempt[]): string {
@@ -51,6 +53,7 @@ export function Home(p: HomeProps) {
   const history = historyFor(p.attempts, p.bank, p.subject, p.scope);
   const finished = p.attempts.filter((a) => a.status === 'finished');
   const pending = pendingExportCount(p.attempts);
+  const open = p.attempts.find((a) => a.status === 'in_progress');
   const hasQuestions = (p.bank?.questions ?? []).some((q) => q.subject === p.subject);
 
   return (
@@ -121,6 +124,11 @@ export function Home(p: HomeProps) {
         <p class="banner warn" role="alert">
           {`${pending} intento(s) sin exportar — exporta ya`}
         </p>
+      )}
+      {open && (
+        <button type="button" class="resume" onClick={p.onResume}>
+          {`Continuar: ${open.title}`}
+        </button>
       )}
       {!p.bank && <p class="empty">No hay banco. Importa bank.json para empezar.</p>}
 

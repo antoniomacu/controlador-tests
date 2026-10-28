@@ -5,9 +5,12 @@ import {
   createAttempt,
   markExported,
   nextAttemptNumber,
+  pauseAttempt,
+  resumeAttempt,
 } from './domain/attempts';
 import { summarizeBankChange, validateBank } from './domain/bank';
 import { ALL, scopesFor, type ScopeFilter } from './domain/history';
+import { isPaused } from './domain/timer';
 import type { Attempt, Bank, Subject } from './domain/types';
 import {
   deleteAttempt,
@@ -26,6 +29,8 @@ import { Home, type HomeSection } from './ui/Home';
 import { Results } from './ui/Results';
 import { Runner } from './ui/Runner';
 import { Setup, type BeginInput } from './ui/Setup';
+import { SwipeCue } from './ui/SwipeCue';
+import { useEdgeSwipe } from './ui/edgeSwipe';
 
 type Screen =
   | { name: 'home' }
@@ -127,7 +132,16 @@ export function App({
     [db],
   );
 
+  // At most one attempt is ever open: it can be left from the runner and continued from home.
+  const open = attempts.find((a) => a.status === 'in_progress') ?? null;
+
   function begin(input: BeginInput) {
+    if (open) {
+      const ask = `Tienes un test sin terminar (${open.title}). ¿Abandonarlo y empezar este?`;
+      if (!confirmFn(ask)) return;
+      setAttempts((prev) => prev.filter((a) => a.uuid !== open.uuid));
+      void deleteAttempt(db, open.uuid);
+    }
     const attempt = createAttempt({
       ...input,
       uuid: newId(),
@@ -166,6 +180,35 @@ export function App({
       outcome === 'shared' ? 'Resultados compartidos.' : 'Resultados guardados en Archivos.',
     );
   }
+
+  /** The edge swipe: one step back towards home. A practice test pauses; an exam asks first. */
+  function goBack() {
+    if (screen.name === 'run') {
+      const a = attempts.find((x) => x.uuid === screen.uuid);
+      if (a?.mode === 'exam') {
+        const ask =
+          '¿Salir del examen? El reloj sigue corriendo y se terminará solo al acabar el tiempo.';
+        if (!confirmFn(ask)) return;
+      } else if (a && !isPaused(a.timer)) {
+        save(pauseAttempt(a, now()));
+      }
+    }
+    setScreen({ name: 'home' });
+  }
+
+  /** Back into the open attempt; an exam whose time ran out meanwhile opens its result. */
+  function onResume() {
+    if (!open) return;
+    const checked = autoFinishIfExpired(open, now());
+    if (checked !== open) {
+      onFinished(checked);
+      return;
+    }
+    if (open.mode === 'practice' && isPaused(open.timer)) save(resumeAttempt(open, now()));
+    setScreen({ name: 'run', uuid: open.uuid });
+  }
+
+  const swipeDx = useEdgeSwipe(loaded && screen.name !== 'home' ? goBack : null);
 
   function onScope(scope: ScopeFilter) {
     const next = { ...scopeBy, [subject]: scope };
@@ -233,6 +276,7 @@ export function App({
         onScope={onScope}
         section={section}
         onSection={setSection}
+        onResume={onResume}
       />
     );
   }
@@ -240,6 +284,7 @@ export function App({
   return (
     <>
       {UpdatePrompt && <UpdatePrompt hidden={screen.name === 'run'} />}
+      {swipeDx > 0 && <SwipeCue dx={swipeDx} />}
       {body}
     </>
   );
