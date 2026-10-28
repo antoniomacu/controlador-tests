@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { isWrong, setCause } from '../domain/attempts';
+import { canDelete } from '../domain/history';
 import { passes, score } from '../domain/scoring';
 import { formatClock } from '../domain/timer';
 import {
@@ -30,6 +31,9 @@ interface ResultsProps {
   attempt: Attempt;
   onChange: (attempt: Attempt) => void;
   onHome: () => void;
+  /** Removes an attempt recorded by mistake; offered only while it has not been exported. */
+  onDelete?: (uuid: string) => void;
+  confirmFn?: (message: string) => boolean;
 }
 
 /** Text marker so correctness never depends on colour alone. */
@@ -39,7 +43,7 @@ function marker(letter: Letter, item: Item): string {
   return '';
 }
 
-export function Results({ attempt: a, onChange, onHome }: ResultsProps) {
+export function Results({ attempt: a, onChange, onHome, onDelete, confirmFn }: ResultsProps) {
   const [filter, setFilter] = useState<Filter>('all');
   const s = score(a.items);
   const ok = passes(s, a.pass_ref);
@@ -125,6 +129,25 @@ export function Results({ attempt: a, onChange, onHome }: ResultsProps) {
       <button type="button" class="home" onClick={onHome}>
         Volver al inicio
       </button>
+
+      {onDelete &&
+        (canDelete(a) ? (
+          <button
+            type="button"
+            class="danger"
+            onClick={() => {
+              if (confirmFn?.('¿Borrar este intento? No se exportará ni contará para nada.')) {
+                onDelete(a.uuid);
+              }
+            }}
+          >
+            Borrar intento
+          </button>
+        ) : (
+          <p class="locked">
+            Exportado: puede estar ya en el Excel, así que no se puede borrar aquí.
+          </p>
+        ))}
     </main>
   );
 }

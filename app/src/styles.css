@@ -131,6 +131,49 @@ button[aria-selected='true'] {
 .test-row .id, .test-row .status { display: block; color: var(--text-muted); font-size: 14px; line-height: 1.4; }
 .test-row .id { font-variant-numeric: tabular-nums; }
 .history-row { font-size: 15px; font-variant-numeric: tabular-nums; }
+.history-row { display: flex; align-items: baseline; gap: var(--space-1); }
+.history-row .what { flex: 1; min-width: 0; color: var(--text-muted); }
+.history-row .net { font-weight: 700; font-size: 17px; color: var(--text); white-space: nowrap; }
+.history-row .low {
+  font-size: 13px; font-weight: 700; color: var(--danger); background: var(--danger-soft);
+  border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+}
+
+/* Chapter filter: pinned while the list scrolls; scrolls sideways inside its own row only. */
+.scopes {
+  position: sticky;
+  /* Below the translucent iOS status bar; the shadow paints the strip above it. */
+  top: env(safe-area-inset-top);
+  box-shadow: 0 calc(-1 * env(safe-area-inset-top)) 0 0 var(--background);
+  z-index: 5;
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin: var(--space-2) -16px 0;
+  padding: 8px 16px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+.scopes::-webkit-scrollbar { display: none; }
+.scopes button {
+  flex: none;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  border-radius: 999px;
+  padding: 0 var(--space-2);
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.scopes button[aria-pressed='true'] {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+  font-weight: 700;
+}
 .random { display: block; width: 100%; margin-top: var(--space-3); border-color: var(--primary); color: var(--primary); }
 .sync { margin-top: var(--space-4); padding-top: var(--space-2); border-top: 1px solid var(--border); }
 .sync > * { flex: 1 1 0; }
@@ -197,7 +240,7 @@ input[type='number'] { width: 6em; margin-left: auto; font-variant-numeric: tabu
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -277,12 +320,24 @@ input[type='number'] { width: 6em; margin-left: auto; font-variant-numeric: tabu
 .filters > button { flex: 1 1 40%; }
 .grid { padding: 4px; }
 
-/* Abandon: secondary, visually separated from the primary Terminar action. */
+/* Abandon: compact secondary button in the top bar, far below Terminar in emphasis. */
 .abandon {
-  display: block;
-  width: 100%;
-  margin-top: var(--space-3);
+  min-height: var(--tap);
+  padding: 0 var(--space-2);
+  font-size: 14px;
   background: transparent;
   border-color: var(--danger);
   color: var(--danger);
 }
+
+/* Destructive action: outlined, never filled, so it never reads as the main action. */
+button.danger {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-4, 32px);
+  min-height: var(--tap);
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.locked { margin-top: var(--space-4, 32px); color: var(--text-muted); font-size: 14px; text-align: center; }

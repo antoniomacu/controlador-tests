@@ -112,4 +112,16 @@ describe('Runner', () => {
     setup('exam');
     expect(screen.queryByRole('button', { name: 'Pausa' })).toBeNull();
   });
+
+  it('puts Abandonar in the top bar, once, still behind a confirmation', () => {
+    const { onAbandon, confirmFn } = setup();
+    const buttons = screen.getAllByRole('button', { name: 'Abandonar' });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].closest('header.runner-bar')).not.toBeNull();
+    fireEvent.click(buttons[0]);
+    expect(confirmFn).toHaveBeenCalledWith(
+      '¿Abandonar este intento? Se borrará y no contará para nada.',
+    );
+    expect(onAbandon).toHaveBeenCalledWith('u');
+  });
 });

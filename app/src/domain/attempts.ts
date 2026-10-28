@@ -79,7 +79,9 @@ export function createAttempt(i: NewAttempt): Attempt {
 }
 
 export function nextAttemptNumber(attempts: readonly Attempt[], testId: string): number {
-  return attempts.filter((a) => a.test_id === testId).length + 1;
+  // Highest number + 1, not count + 1: after a delete, a count would hand out a duplicate number.
+  const numbers = attempts.filter((a) => a.test_id === testId).map((a) => a.attempt);
+  return Math.max(0, ...numbers) + 1;
 }
 
 function updateItem(a: Attempt, index: number, patch: Partial<Item>): Attempt {
