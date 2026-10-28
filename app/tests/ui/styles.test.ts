@@ -11,8 +11,23 @@ const block = (selector: string) => {
 };
 
 describe('styles', () => {
-  it('pins the chapter row below the iPhone status bar, not behind it', () => {
-    expect(block('.scopes')).toContain('top: env(safe-area-inset-top)');
+  it('pins tabs and chapters as one header padded below the iPhone status bar', () => {
+    const top = block('.home-top');
+    expect(top).toContain('position: sticky');
+    expect(top).toContain('top: 0');
+    expect(top).toContain('padding: calc(env(safe-area-inset-top)');
+  });
+
+  it('never paints over the subject tabs: the chapter row casts no upward shadow', () => {
+    expect(block('.scopes')).not.toContain('box-shadow');
+    expect(block('.scopes')).not.toContain('position: sticky');
+  });
+
+  it('lays the section switch out as one row of three equal, full-height tap targets', () => {
+    expect(block('.sections')).toContain('display: flex');
+    expect(block('.sections [role=\'tab\']')).toContain('flex: 1');
+    expect(block('.sections [role=\'tab\']')).toContain('min-height: var(--tap)');
+    expect(block(".sections [role='tab'][aria-selected='true']")).toContain('border-bottom-color');
   });
 
   it('keeps the runner bar tight enough for clock, progress, Reanudar and Abandonar', () => {

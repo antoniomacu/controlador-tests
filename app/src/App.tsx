@@ -22,7 +22,7 @@ import {
 } from './storage/db';
 import { buildResultsFile, deliverFile, downloadFile, type ShareNav } from './sync/exportResults';
 import { readBankFile } from './sync/importBank';
-import { Home } from './ui/Home';
+import { Home, type HomeSection } from './ui/Home';
 import { Results } from './ui/Results';
 import { Runner } from './ui/Runner';
 import { Setup, type BeginInput } from './ui/Setup';
@@ -64,6 +64,8 @@ export function App({
   const [loaded, setLoaded] = useState(false);
   // Chapter chip per subject. Held here, not in Home, so it survives a test or a result screen.
   const [scopeBy, setScopeBy] = useState<Partial<Record<Subject, ScopeFilter>>>({});
+  // Temas / Historial / Práctica: kept for the session so a result screen returns to it.
+  const [section, setSection] = useState<HomeSection>('temas');
 
   // Startup: resume an open attempt, or finish it if an exam expired while the app was closed.
   useEffect(() => {
@@ -229,6 +231,8 @@ export function App({
         onOpenAttempt={(uuid) => setScreen({ name: 'results', uuid })}
         scope={scope}
         onScope={onScope}
+        section={section}
+        onSection={setSection}
       />
     );
   }

@@ -140,21 +140,46 @@ button[aria-selected='true'] {
 }
 
 /* Chapter filter: pinned while the list scrolls; scrolls sideways inside its own row only. */
-.scopes {
+/* Subject tabs and chapter chips, pinned together. Same pattern as .runner-bar: it reaches up
+   under the translucent iOS status bar and pads its own content below it. */
+.home-top {
   position: sticky;
-  /* Below the translucent iOS status bar; the shadow paints the strip above it. */
-  top: env(safe-area-inset-top);
-  box-shadow: 0 calc(-1 * env(safe-area-inset-top)) 0 0 var(--background);
+  top: 0;
   z-index: 5;
+  margin: calc(-1 * env(safe-area-inset-top)) -16px 0;
+  padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+/* Temas / Historial / Práctica: underlined tabs, one level below the subject pill above. */
+.sections {
+  display: flex;
+  margin-top: var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+.sections [role='tab'] {
+  flex: 1;
+  min-height: var(--tap);
+  padding: 0 var(--space-1);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+.sections [role='tab'][aria-selected='true'] {
+  color: var(--text);
+  font-weight: 700;
+  border-bottom-color: var(--primary);
+}
+.scopes {
   display: flex;
   gap: var(--space-1);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  margin: var(--space-2) -16px 0;
-  padding: 8px 16px;
-  background: var(--background);
-  border-bottom: 1px solid var(--border);
+  margin: var(--space-1) -16px 0;
+  padding: 0 16px;
 }
 .scopes::-webkit-scrollbar { display: none; }
 .scopes button {
