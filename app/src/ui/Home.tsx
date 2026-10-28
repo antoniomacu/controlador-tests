@@ -3,6 +3,20 @@ import { ALL, historyFor, isLowScore, scopesFor, type ScopeFilter } from '../dom
 import { score } from '../domain/scoring';
 import type { Attempt, Bank, Subject, TestDef } from '../domain/types';
 
+/** The three pages of a subject. Held by App so a result screen returns to the same one. */
+export type HomeSection = 'temas' | 'historial' | 'practica';
+
+const SECTIONS: { id: HomeSection; label: string }[] = [
+  { id: 'temas', label: 'Temas' },
+  { id: 'historial', label: 'Historial' },
+  { id: 'practica', label: 'Práctica' },
+];
+
+/** A tap in the pinned header shows new content from its top, not mid-page. */
+function toTop() {
+  if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
 interface HomeProps {
   bank: Bank | null;
   attempts: Attempt[];
@@ -18,6 +32,8 @@ interface HomeProps {
   /** Chapter filter: `ALL` or one scope; held by App so it survives navigation. */
   scope: ScopeFilter;
   onScope: (scope: ScopeFilter) => void;
+  section: HomeSection;
+  onSection: (section: HomeSection) => void;
 }
 
 function status(test: TestDef, attempts: Attempt[]): string {
@@ -39,19 +55,62 @@ export function Home(p: HomeProps) {
 
   return (
     <main class="home">
-      <nav class="tabs" role="tablist">
-        {(['temario', 'ingles'] as const).map((s) => (
-          <button
-            type="button"
-            role="tab"
-            key={s}
-            aria-selected={p.subject === s}
-            onClick={() => p.onSubject(s)}
-          >
-            {s === 'temario' ? 'Temario' : 'Inglés'}
-          </button>
-        ))}
-      </nav>
+      {/* Subject, section and chapter rows are pinned together, padded below the iOS status bar. */}
+      <header class="home-top">
+        <nav class="tabs" role="tablist">
+          {(['temario', 'ingles'] as const).map((s) => (
+            <button
+              type="button"
+              role="tab"
+              key={s}
+              aria-selected={p.subject === s}
+              onClick={() => p.onSubject(s)}
+            >
+              {s === 'temario' ? 'Temario' : 'Inglés'}
+            </button>
+          ))}
+        </nav>
+        <nav class="sections" role="tablist" aria-label="Sección">
+          {SECTIONS.map((s) => (
+            <button
+              type="button"
+              role="tab"
+              key={s.id}
+              aria-selected={p.section === s.id}
+              onClick={() => {
+                p.onSection(s.id);
+                toTop();
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </nav>
+        {p.section !== 'practica' && scopes.length > 1 && (
+          <nav class="scopes" aria-label="Temas">
+            {[ALL, ...scopes].map((s) => (
+              <button
+                type="button"
+                key={s}
+                aria-pressed={p.scope === s}
+                ref={(el) => {
+                  if (el && p.scope === s)
+                    el.scrollIntoView?.({
+                      inline: 'nearest',
+                      block: 'nearest',
+                    });
+                }}
+                onClick={() => {
+                  p.onScope(s);
+                  toTop();
+                }}
+              >
+                {s === ALL ? 'Todos' : s}
+              </button>
+            ))}
+          </nav>
+        )}
+      </header>
 
       {p.message && (
         <p class="banner" role="status">
@@ -65,57 +124,34 @@ export function Home(p: HomeProps) {
       )}
       {!p.bank && <p class="empty">No hay banco. Importa bank.json para empezar.</p>}
 
-      {scopes.length > 1 && (
-        <nav class="scopes" aria-label="Temas">
-          {[ALL, ...scopes].map((s) => (
-            <button
-              type="button"
-              key={s}
-              aria-pressed={p.scope === s}
-              ref={(el) => {
-                if (el && p.scope === s) el.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
-              }}
-              onClick={(e) => {
-                p.onScope(s);
-                // Tapped mid-scroll: bring the page back to the chip row, the top of the chapter.
-                // Measured from the element above the row: a stuck sticky row reports where it is
-                // pinned, not where it sits in the page.
-                const above = (e.currentTarget as HTMLElement).parentElement?.previousElementSibling;
-                const top = above instanceof HTMLElement ? above.offsetTop + above.offsetHeight : 0;
-                if (window.scrollY > top) window.scrollTo({ top, behavior: 'auto' });
-              }}
-            >
-              {s === ALL ? 'Todos' : s}
-            </button>
-          ))}
-        </nav>
+      {p.section === 'temas' &&
+        shown.map((scope) => (
+          <section key={scope} class="scope">
+            <h2>{scope}</h2>
+            {tests
+              .filter((t) => t.scope === scope)
+              .map((t) => (
+                <button
+                  type="button"
+                  key={t.id}
+                  class="test-row"
+                  onClick={() => p.onOpenTest(t.id)}
+                >
+                  <span class="title">{t.title}</span>
+                  <span class="id">{t.id}</span>
+                  <span class="status">{status(t, p.attempts)}</span>
+                </button>
+              ))}
+          </section>
+        ))}
+
+      {p.section === 'practica' && (
+        <button type="button" class="random" disabled={!hasQuestions} onClick={p.onRandom}>
+          Práctica aleatoria
+        </button>
       )}
 
-      {shown.map((scope) => (
-        <section key={scope} class="scope">
-          <h2>{scope}</h2>
-          {tests
-            .filter((t) => t.scope === scope)
-            .map((t) => (
-              <button
-                type="button"
-                key={t.id}
-                class="test-row"
-                onClick={() => p.onOpenTest(t.id)}
-              >
-                <span class="title">{t.title}</span>
-                <span class="id">{t.id}</span>
-                <span class="status">{status(t, p.attempts)}</span>
-              </button>
-            ))}
-        </section>
-      ))}
-
-      <button type="button" class="random" disabled={!hasQuestions} onClick={p.onRandom}>
-        Práctica aleatoria
-      </button>
-
-      {history.length > 0 && (
+      {p.section === 'historial' && (
         <section class="history">
           <h2>{p.scope === ALL ? 'Historial' : `Historial · ${p.scope}`}</h2>
           {history.map((a) => (
@@ -130,6 +166,9 @@ export function Home(p: HomeProps) {
               {isLowScore(a) && <span class="low">bajo</span>}
             </button>
           ))}
+          {history.length === 0 && (
+            <p class="empty">{p.scope === ALL ? 'Sin intentos.' : `Sin intentos en ${p.scope}.`}</p>
+          )}
         </section>
       )}
 

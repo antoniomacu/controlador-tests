@@ -141,7 +141,8 @@ describe('App', () => {
     };
     await putBank(db, v1 as never);
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Práctica aleatoria' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Práctica' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Práctica aleatoria' }));
     fireEvent.click(screen.getByLabelText(/Tema 4/));
     fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
     expect(await screen.findByText(/Enunciado/)).toBeTruthy();
@@ -166,8 +167,11 @@ describe('App', () => {
     await startTest();
     await finishAndGoHome();
     expect(pressed('T4')).toBe(true);
+    fireEvent.click(screen.getByRole('tab', { name: 'Historial' }));
     fireEvent.click(document.querySelector('.history-row') as Element);
     fireEvent.click(await screen.findByRole('button', { name: 'Volver al inicio' }));
+    // Back on the same section and chapter the attempt was opened from.
+    expect(screen.getByRole('tab', { name: 'Historial' }).getAttribute('aria-selected')).toBe('true');
     expect(pressed('T4')).toBe(true);
   });
 
@@ -203,6 +207,8 @@ describe('App', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Terminar' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Borrar intento' }));
     expect(await screen.findByRole('button', { name: 'Exportar resultados (0)' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Historial' }));
+    expect(screen.getByText('Sin intentos.')).toBeTruthy();
     expect(document.querySelector('.history-row')).toBeNull();
     await waitFor(async () => expect(await listAttempts(db)).toHaveLength(0));
   });

@@ -58,8 +58,8 @@ const done = (finished: string, exported = false, testId = 'SYN-T4-001', passRef
     items: [{ key: 'a', ans: 'a' }],
   }) as unknown as Attempt;
 
-function renderHome(attempts: Attempt[], over: Record<string, unknown> = {}) {
-  const props = {
+function baseProps(attempts: Attempt[]) {
+  return {
     bank,
     attempts,
     subject: 'temario' as const,
@@ -73,10 +73,21 @@ function renderHome(attempts: Attempt[], over: Record<string, unknown> = {}) {
     onOpenAttempt: vi.fn(),
     scope: ALL,
     onScope: vi.fn(),
-    ...over,
+    section: 'temas' as const,
+    onSection: vi.fn(),
   };
+}
+
+function renderHome(attempts: Attempt[], over: Record<string, unknown> = {}) {
+  const props = { ...baseProps(attempts), ...over };
   render(<Home {...props} />);
   return props;
+}
+
+/** Like renderHome, but hands back unmount so one test can render several sections. */
+function renderHomeWith(over: Record<string, unknown>) {
+  const props = { ...baseProps([]), ...over };
+  return render(<Home {...props} />);
 }
 
 describe('Home', () => {
@@ -131,8 +142,7 @@ describe('Home', () => {
       done(`2026-10-${String(i + 1).padStart(2, '0')}T10:00:00Z`),
     );
     const t3 = done('2026-10-20T10:00:00Z', false, 'SYN-T3-001');
-    renderHome([...t4, t3], { scope: 'T4' });
-    expect(screen.queryByRole('heading', { name: 'T3' })).toBeNull();
+    renderHome([...t4, t3], { scope: 'T4', section: 'historial' });
     expect(screen.getByRole('heading', { name: 'Historial · T4' })).toBeTruthy();
     const rows = document.querySelectorAll('.history-row');
     expect(rows).toHaveLength(12);
@@ -140,13 +150,14 @@ describe('Home', () => {
   });
 
   it('flags a low score with the word bajo, not colour alone', () => {
-    renderHome([done('2026-10-13T10:00:00Z', false, 'SYN-T4-001', 10)]);
+    renderHome([done('2026-10-13T10:00:00Z', false, 'SYN-T4-001', 10)], { section: 'historial' });
     const row = document.querySelector('.history-row');
     expect(row?.querySelector('.low')?.textContent).toBe('bajo');
   });
 
   it('does not flag a passing score', () => {
-    renderHome([done('2026-10-13T10:00:00Z', false, 'SYN-T4-001', 0)]);
+    renderHome([done('2026-10-13T10:00:00Z', false, 'SYN-T4-001', 0)], { section: 'historial' });
+    expect(document.querySelector('.history-row')).not.toBeNull();
     expect(document.querySelector('.history-row .low')).toBeNull();
   });
 
@@ -155,10 +166,68 @@ describe('Home', () => {
     expect(screen.queryByRole('navigation', { name: 'Temas' })).toBeNull();
   });
 
-  it('keeps random practice and the sync footer under a chapter', () => {
-    renderHome([done('2026-10-13T10:00:00Z')], { scope: 'T3' });
-    expect(screen.getByRole('button', { name: 'Práctica aleatoria' })).toBeTruthy();
-    expect(screen.getByText('Importar banco')).toBeTruthy();
+  it('shows only that chapter\'s tests under Temas, without history or random practice', () => {
+    renderHome([done('2026-10-13T10:00:00Z')], { scope: 'T4' });
+    expect(screen.getByRole('heading', { name: 'T4' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'T3' })).toBeNull();
+    expect(document.querySelector('.history-row')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Práctica aleatoria' })).toBeNull();
+  });
+
+  it('offers Temas, Historial and Práctica in the pinned header, Temas selected', () => {
+    renderHome([]);
+    const header = document.querySelector('header.home-top')!;
+    const sections = header.querySelector('[role="tablist"][aria-label="Sección"]');
+    expect(sections).not.toBeNull();
+    const tabs = Array.from(sections!.querySelectorAll('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent)).toEqual(['Temas', 'Historial', 'Práctica']);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('asks to change section when a section tab is tapped', () => {
+    const props = renderHome([]);
+    fireEvent.click(screen.getByRole('tab', { name: 'Historial' }));
+    expect(props.onSection).toHaveBeenCalledWith('historial');
+  });
+
+  it('shows the history with the chapter row and no test list under Historial', () => {
+    renderHome([done('2026-10-13T10:00:00Z')], { section: 'historial' });
+    expect(screen.getByRole('navigation', { name: 'Temas' })).toBeTruthy();
+    expect(document.querySelectorAll('.history-row')).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: 'T4' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tema 3: Meteorología/ })).toBeNull();
+  });
+
+  it('says there are no attempts when the chosen history is empty', () => {
+    renderHome([], { section: 'historial', scope: 'T3' });
+    expect(screen.getByText('Sin intentos en T3.')).toBeTruthy();
+  });
+
+  it('shows only random practice, without chapter row, under Práctica', () => {
+    const props = renderHome([done('2026-10-13T10:00:00Z')], { section: 'practica' });
+    expect(screen.queryByRole('navigation', { name: 'Temas' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'T4' })).toBeNull();
+    expect(document.querySelector('.history-row')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Práctica aleatoria' }));
+    expect(props.onRandom).toHaveBeenCalled();
+  });
+
+  it('keeps the sync footer in every section', () => {
+    for (const section of ['temas', 'historial', 'practica'] as const) {
+      const { unmount } = renderHomeWith({ section });
+      expect(screen.getByText('Importar banco')).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it('takes the page back to the top when the section changes mid-scroll', () => {
+    const scrollTo = vi.fn();
+    window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+    Object.defineProperty(window, 'scrollY', { value: 900, configurable: true });
+    renderHome([]);
+    fireEvent.click(screen.getByRole('tab', { name: 'Práctica' }));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
   });
 
   it('takes the page back to the chapter row when a chip is tapped mid-scroll', () => {
@@ -167,7 +236,15 @@ describe('Home', () => {
     Object.defineProperty(window, 'scrollY', { value: 900, configurable: true });
     renderHome([]);
     fireEvent.click(screen.getByRole('button', { name: 'T4' }));
-    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+  });
+
+  it('keeps the subject tabs and the chapter row in the same pinned header', () => {
+    renderHome([]);
+    const header = document.querySelector('header.home-top');
+    expect(header).not.toBeNull();
+    expect(header!.querySelector('[role="tablist"]')).not.toBeNull();
+    expect(header!.querySelector('nav[aria-label="Temas"]')).not.toBeNull();
   });
 });
